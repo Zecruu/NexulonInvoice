@@ -37,7 +37,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
               <XAxis dataKey="month" className="text-xs" />
               <YAxis tickFormatter={formatDollar} className="text-xs" />
               <Tooltip
-                formatter={(value: number) => [formatDollar(value), "Revenue"]}
+                formatter={(value: number | undefined) => [formatDollar(value ?? 0), "Revenue"]}
               />
               <Bar
                 dataKey="revenue"
