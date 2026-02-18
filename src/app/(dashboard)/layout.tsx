@@ -3,6 +3,8 @@ import { Header } from "@/components/layout/header";
 import { getCurrentUser } from "@/lib/get-user";
 import { isAdmin } from "@/lib/admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
