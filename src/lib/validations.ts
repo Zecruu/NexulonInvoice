@@ -31,12 +31,12 @@ export const invoiceSchema = z.object({
   issueDate: z.string().min(1, "Issue date is required"),
   dueDate: z.string().min(1, "Due date is required"),
   lineItems: z.array(lineItemSchema).min(1, "At least one line item is required"),
-  taxRate: z.number().min(0).max(100).default(0),
+  taxRate: z.number().min(0).max(100),
   discountType: z.enum(["percentage", "fixed"]).optional(),
   discountValue: z.number().min(0).optional(),
   notes: z.string().optional(),
   internalNotes: z.string().optional(),
-  currency: z.string().default("USD"),
+  currency: z.string(),
 });
 
 export type InvoiceFormData = z.infer<typeof invoiceSchema>;
