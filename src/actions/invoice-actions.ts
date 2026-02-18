@@ -152,7 +152,7 @@ export async function createInvoice(data: InvoiceFormData) {
 
   const parsed = invoiceSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: parsed.error.issues[0].message };
   }
 
   const { subtotal, taxAmount, discountAmount, total, lineItems } =
@@ -198,7 +198,7 @@ export async function updateInvoice(invoiceId: string, data: InvoiceFormData) {
 
   const parsed = invoiceSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: parsed.error.issues[0].message };
   }
 
   const { subtotal, taxAmount, discountAmount, total, lineItems } =

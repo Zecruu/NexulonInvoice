@@ -91,7 +91,7 @@ export async function createClient(data: ClientFormData) {
 
   const parsed = clientSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: parsed.error.issues[0].message };
   }
 
   const client = await Client.create({
@@ -109,7 +109,7 @@ export async function updateClient(clientId: string, data: ClientFormData) {
 
   const parsed = clientSchema.safeParse(data);
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message };
+    return { error: parsed.error.issues[0].message };
   }
 
   const client = await Client.findOneAndUpdate(
