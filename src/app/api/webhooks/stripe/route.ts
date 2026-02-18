@@ -1,8 +1,7 @@
-import { stripe } from "@/lib/stripe";
+import { getStripe, Stripe } from "@/lib/stripe";
 import dbConnect from "@/lib/db";
 import { Invoice } from "@/models/invoice";
 import { Payment } from "@/models/payment";
-import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!

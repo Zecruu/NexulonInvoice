@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import dbConnect from "@/lib/db";
 import { getCurrentUser } from "@/lib/get-user";
 import { Invoice } from "@/models/invoice";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 
 export async function createCheckoutSession(invoiceId: string) {
   const user = await getCurrentUser();
@@ -22,7 +22,7 @@ export async function createCheckoutSession(invoiceId: string) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "payment",
     customer_email:
       typeof invoice.clientId === "object" && "email" in invoice.clientId
