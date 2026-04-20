@@ -112,6 +112,9 @@ export interface AdminUserType {
   businessName?: string;
   tier: Tier;
   tierUpdatedAt?: string;
+  banned?: boolean;
+  bannedAt?: string;
+  bannedReason?: string;
   invoicesThisMonth: number;
   createdAt: string;
 }

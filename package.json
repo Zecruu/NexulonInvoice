@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-socialmessaging": "^3.1032.0",
     "@clerk/nextjs": "^6.37.5",
+    "@google/genai": "^1.50.1",
     "@hookform/resolvers": "^5.2.2",
     "@react-email/components": "^1.0.8",
     "@react-pdf/renderer": "^4.3.2",

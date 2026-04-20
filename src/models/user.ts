@@ -21,6 +21,9 @@ export interface IUser extends Document {
   defaultTaxRate: number;
   tier: "free" | "pro";
   tierUpdatedAt?: Date;
+  banned?: boolean;
+  bannedAt?: Date;
+  bannedReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +50,9 @@ const UserSchema = new Schema<IUser>(
     defaultTaxRate: { type: Number, default: 0 },
     tier: { type: String, enum: ["free", "pro"], default: "free" },
     tierUpdatedAt: Date,
+    banned: { type: Boolean, default: false, index: true },
+    bannedAt: Date,
+    bannedReason: String,
   },
   { timestamps: true }
 );

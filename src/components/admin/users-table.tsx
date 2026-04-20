@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Ban, CheckCircle2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Table,
@@ -15,7 +15,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { updateUserTier } from "@/actions/admin-actions";
+import {
+  updateUserTier,
+  banUser,
+  unbanUser,
+  deleteUser,
+} from "@/actions/admin-actions";
 import { TIER_COLORS, TIER_LABELS, TIER_LIMITS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import type { AdminUserType } from "@/types";
@@ -25,30 +30,73 @@ interface UsersTableProps {
   users: AdminUserType[];
 }
 
+type PendingAction =
+  | { kind: "tier"; userId: string; name: string; newTier: Tier }
+  | { kind: "ban"; userId: string; name: string }
+  | { kind: "unban"; userId: string; name: string }
+  | { kind: "delete"; userId: string; name: string };
+
 export function UsersTable({ users }: UsersTableProps) {
   const router = useRouter();
-  const [pendingChange, setPendingChange] = useState<{
-    userId: string;
-    name: string;
-    newTier: Tier;
-  } | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleConfirm() {
-    if (!pendingChange) return;
+    if (!pending) return;
     setLoading(true);
-    const result = await updateUserTier(pendingChange.userId, pendingChange.newTier);
+
+    let result: { error?: string; success?: boolean } = {};
+    if (pending.kind === "tier") {
+      result = await updateUserTier(pending.userId, pending.newTier);
+    } else if (pending.kind === "ban") {
+      result = await banUser(pending.userId);
+    } else if (pending.kind === "unban") {
+      result = await unbanUser(pending.userId);
+    } else if (pending.kind === "delete") {
+      result = await deleteUser(pending.userId);
+    }
+
     setLoading(false);
-    setPendingChange(null);
+    const snapshot = pending;
+    setPending(null);
 
     if (result.error) {
       toast.error(result.error);
-    } else {
-      toast.success(
-        `${pendingChange.name} upgraded to ${TIER_LABELS[pendingChange.newTier]}`
-      );
-      router.refresh();
+      return;
     }
+
+    if (snapshot.kind === "tier") {
+      toast.success(`${snapshot.name} → ${TIER_LABELS[snapshot.newTier]}`);
+    } else if (snapshot.kind === "ban") {
+      toast.success(`${snapshot.name} banned`);
+    } else if (snapshot.kind === "unban") {
+      toast.success(`${snapshot.name} unbanned`);
+    } else if (snapshot.kind === "delete") {
+      toast.success(`${snapshot.name} deleted`);
+    }
+    router.refresh();
+  }
+
+  function dialogTitle() {
+    if (!pending) return "";
+    if (pending.kind === "tier") return `Change tier to ${TIER_LABELS[pending.newTier]}`;
+    if (pending.kind === "ban") return "Ban user";
+    if (pending.kind === "unban") return "Unban user";
+    return "Delete user";
+  }
+
+  function dialogDescription() {
+    if (!pending) return "";
+    if (pending.kind === "tier") {
+      return `Change ${pending.name} to the ${TIER_LABELS[pending.newTier]} tier?`;
+    }
+    if (pending.kind === "ban") {
+      return `Suspend ${pending.name}'s access? They'll see a banned screen until unbanned.`;
+    }
+    if (pending.kind === "unban") {
+      return `Restore ${pending.name}'s access?`;
+    }
+    return `Permanently delete ${pending.name}? This removes the user from the database AND deletes their Clerk account. This cannot be undone.`;
   }
 
   return (
@@ -73,10 +121,20 @@ export function UsersTable({ users }: UsersTableProps) {
                 "—";
               const tier = (user.tier || "free") as Tier;
               const limit = TIER_LIMITS[tier];
+              const banned = Boolean((user as unknown as { banned?: boolean }).banned);
 
               return (
-                <TableRow key={user._id}>
-                  <TableCell className="font-medium">{name}</TableCell>
+                <TableRow key={user._id} className={banned ? "opacity-60" : ""}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {name}
+                      {banned && (
+                        <Badge variant="destructive" className="text-[10px]">
+                          Banned
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={TIER_COLORS[tier]}>
@@ -99,20 +157,55 @@ export function UsersTable({ users }: UsersTableProps) {
                     {formatDate(user.createdAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setPendingChange({
-                          userId: user._id,
-                          name,
-                          newTier: tier === "free" ? "pro" : "free",
-                        })
-                      }
-                    >
-                      <ArrowUpDown className="mr-1 h-3 w-3" />
-                      {tier === "free" ? "Upgrade" : "Downgrade"}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setPending({
+                            kind: "tier",
+                            userId: user._id,
+                            name,
+                            newTier: tier === "free" ? "pro" : "free",
+                          })
+                        }
+                      >
+                        <ArrowUpDown className="mr-1 h-3 w-3" />
+                        {tier === "free" ? "Upgrade" : "Downgrade"}
+                      </Button>
+                      {banned ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setPending({ kind: "unban", userId: user._id, name })
+                          }
+                        >
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          Unban
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setPending({ kind: "ban", userId: user._id, name })
+                          }
+                        >
+                          <Ban className="mr-1 h-3 w-3" />
+                          Ban
+                        </Button>
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() =>
+                          setPending({ kind: "delete", userId: user._id, name })
+                        }
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -122,15 +215,11 @@ export function UsersTable({ users }: UsersTableProps) {
       </div>
 
       <ConfirmDialog
-        open={!!pendingChange}
-        onOpenChange={(open) => !open && setPendingChange(null)}
-        title={`Change tier to ${pendingChange ? TIER_LABELS[pendingChange.newTier] : ""}`}
-        description={
-          pendingChange
-            ? `Are you sure you want to change ${pendingChange.name} to the ${TIER_LABELS[pendingChange.newTier]} tier?`
-            : ""
-        }
-        confirmLabel="Confirm"
+        open={!!pending}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={dialogTitle()}
+        description={dialogDescription()}
+        confirmLabel={pending?.kind === "delete" ? "Delete" : "Confirm"}
         onConfirm={handleConfirm}
         loading={loading}
       />

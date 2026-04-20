@@ -8,30 +8,17 @@ import {
   Users,
   Settings,
   Shield,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWhatsAppUnread } from "@/hooks/use-whatsapp-unread";
 
 const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Invoices",
-    href: "/invoices",
-    icon: FileText,
-  },
-  {
-    label: "Clients",
-    href: "/clients",
-    icon: Users,
-  },
-  {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Invoices", href: "/invoices", icon: FileText },
+  { label: "Clients", href: "/clients", icon: Users },
+  { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, badge: "whatsapp" as const },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -40,9 +27,10 @@ interface SidebarProps {
 
 export function Sidebar({ isAdmin }: SidebarProps) {
   const pathname = usePathname();
+  const unread = useWhatsAppUnread();
 
   const items = isAdmin
-    ? [...navItems, { label: "Admin", href: "/admin", icon: Shield }]
+    ? [...navItems, { label: "Users", href: "/admin", icon: Shield }]
     : navItems;
 
   return (
@@ -55,6 +43,8 @@ export function Sidebar({ isAdmin }: SidebarProps) {
         {items.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
+          const showBadge =
+            "badge" in item && item.badge === "whatsapp" && unread > 0;
           return (
             <Link
               key={item.href}
@@ -67,7 +57,12 @@ export function Sidebar({ isAdmin }: SidebarProps) {
               )}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {showBadge && (
+                <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
             </Link>
           );
         })}

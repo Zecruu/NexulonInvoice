@@ -26,7 +26,7 @@ export default async function AdminPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Admin" description="Manage users and tiers">
+      <PageHeader title="Users" description="Manage users, tiers, and access">
         <Shield className="h-5 w-5 text-muted-foreground" />
       </PageHeader>
 

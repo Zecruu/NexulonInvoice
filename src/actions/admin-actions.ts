@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { clerkClient } from "@clerk/nextjs/server";
 import dbConnect from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, isAdmin } from "@/lib/admin";
 import { User } from "@/models/user";
 import { Invoice } from "@/models/invoice";
 import type { Tier } from "@/lib/constants";
@@ -105,6 +106,68 @@ export async function updateUserTier(userId: string, tier: Tier) {
   );
 
   if (!user) return { error: "User not found" };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function banUser(userId: string, reason?: string) {
+  const currentAdmin = await requireAdmin();
+  await dbConnect();
+
+  const target = await User.findById(userId);
+  if (!target) return { error: "User not found" };
+  if (isAdmin(target.email)) return { error: "Cannot ban an admin" };
+  if (String(target._id) === String(currentAdmin._id)) {
+    return { error: "Cannot ban yourself" };
+  }
+
+  target.banned = true;
+  target.bannedAt = new Date();
+  target.bannedReason = reason || "";
+  await target.save();
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function unbanUser(userId: string) {
+  await requireAdmin();
+  await dbConnect();
+
+  const target = await User.findByIdAndUpdate(
+    userId,
+    { banned: false, bannedAt: null, bannedReason: null },
+    { new: true }
+  );
+  if (!target) return { error: "User not found" };
+
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function deleteUser(userId: string) {
+  const currentAdmin = await requireAdmin();
+  await dbConnect();
+
+  const target = await User.findById(userId);
+  if (!target) return { error: "User not found" };
+  if (isAdmin(target.email)) return { error: "Cannot delete an admin" };
+  if (String(target._id) === String(currentAdmin._id)) {
+    return { error: "Cannot delete yourself" };
+  }
+
+  const clerkId: string | undefined = target.clerkId;
+  await User.findByIdAndDelete(userId);
+
+  if (clerkId) {
+    try {
+      const client = await clerkClient();
+      await client.users.deleteUser(clerkId);
+    } catch (err) {
+      console.error("[deleteUser] Clerk delete failed:", err);
+    }
+  }
 
   revalidatePath("/admin");
   return { success: true };
