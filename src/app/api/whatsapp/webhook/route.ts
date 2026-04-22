@@ -58,38 +58,53 @@ interface MetaPayload {
 }
 
 interface AwsSocialMessagingPayload {
+  context?: {
+    MetaWabaIds?: Array<{ wabaId?: string; arn?: string }>;
+    MetaPhoneNumberIds?: Array<{ metaPhoneNumberId?: string; arn?: string }>;
+  };
   aws?: {
     phoneNumber?: string;
     phoneNumberId?: string;
     configurationSetName?: string;
   };
-  whatsAppWebhookEntry?: MetaPayload;
-  webhookEntry?: MetaPayload;
+  whatsAppWebhookEntry?: MetaEntry | string;
+  webhookEntry?: MetaEntry | string;
+  aws_account_id?: string;
+  message_timestamp?: string;
 }
 
 function extractMetaPayload(
   message: string
 ): { payload: MetaPayload; phoneNumberId?: string } | null {
   try {
-    const parsed = JSON.parse(message) as AwsSocialMessagingPayload | MetaPayload;
+    const parsed = JSON.parse(message) as AwsSocialMessagingPayload & MetaPayload;
 
-    if ("whatsAppWebhookEntry" in parsed && parsed.whatsAppWebhookEntry) {
-      return {
-        payload: parsed.whatsAppWebhookEntry,
-        phoneNumberId: parsed.aws?.phoneNumberId,
-      };
+    const rawEntry: MetaEntry | string | undefined =
+      parsed.whatsAppWebhookEntry ?? parsed.webhookEntry;
+
+    if (rawEntry) {
+      const entry: MetaEntry =
+        typeof rawEntry === "string"
+          ? (JSON.parse(rawEntry) as MetaEntry)
+          : rawEntry;
+
+      const phoneNumberId =
+        parsed.context?.MetaPhoneNumberIds?.[0]?.metaPhoneNumberId ||
+        entry.changes?.[0]?.value?.metadata?.phone_number_id ||
+        parsed.aws?.phoneNumberId;
+
+      return { payload: { entry: [entry] }, phoneNumberId };
     }
-    if ("webhookEntry" in parsed && parsed.webhookEntry) {
-      return {
-        payload: parsed.webhookEntry,
-        phoneNumberId: (parsed as AwsSocialMessagingPayload).aws?.phoneNumberId,
-      };
+
+    if (Array.isArray(parsed.entry)) {
+      const phoneNumberId =
+        parsed.entry[0]?.changes?.[0]?.value?.metadata?.phone_number_id;
+      return { payload: parsed as MetaPayload, phoneNumberId };
     }
-    if ("entry" in parsed) {
-      return { payload: parsed as MetaPayload };
-    }
+
     return null;
-  } catch {
+  } catch (err) {
+    console.warn("[whatsapp-webhook] extractMetaPayload threw:", err);
     return null;
   }
 }
@@ -122,13 +137,23 @@ async function processInboundMessage(
   messageText: string,
   waMessageId: string | undefined
 ): Promise<void> {
-  const botConfig = phoneNumberId
+  let botConfig = phoneNumberId
     ? await WhatsAppBotConfig.findOne({ phoneNumberId })
     : null;
 
   if (!botConfig) {
+    const total = await WhatsAppBotConfig.countDocuments();
+    if (total === 1) {
+      botConfig = await WhatsAppBotConfig.findOne({});
+      console.warn(
+        `[whatsapp-webhook] No exact phoneNumberId match for ${phoneNumberId}, falling back to the only existing bot config`
+      );
+    }
+  }
+
+  if (!botConfig) {
     console.warn(
-      `[whatsapp-webhook] No bot config for phoneNumberId=${phoneNumberId}. Skipping.`
+      `[whatsapp-webhook] No bot config for phoneNumberId=${phoneNumberId} and no fallback. Skipping.`
     );
     return;
   }
