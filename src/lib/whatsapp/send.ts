@@ -41,7 +41,7 @@ interface SendWhatsAppTextOptions {
 export async function sendWhatsAppText(
   opts: SendWhatsAppTextOptions
 ): Promise<{ messageId?: string }> {
-  const to = normalizePhone(opts.toPhone).replace(/^\+/, "");
+  const to = normalizePhone(opts.toPhone);
 
   const payload = {
     messaging_product: "whatsapp",
