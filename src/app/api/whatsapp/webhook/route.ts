@@ -39,7 +39,15 @@ interface MetaValue {
       list_reply?: { title?: string };
     };
   }>;
-  statuses?: Array<{ id?: string; status?: string; recipient_id?: string }>;
+  statuses?: Array<{
+    id?: string;
+    status?: string;
+    recipient_id?: string;
+    timestamp?: string;
+    errors?: Array<{ code?: number; title?: string; message?: string; error_data?: { details?: string } }>;
+    conversation?: { id?: string; origin?: { type?: string } };
+    pricing?: { billable?: boolean; pricing_model?: string; category?: string };
+  }>;
 }
 
 interface MetaChange {
@@ -288,11 +296,14 @@ async function processInboundMessage(
   conversation.language = athena.language;
 
   try {
-    await sendWhatsAppText({
+    const sendResult = await sendWhatsAppText({
       originationIdentity: botConfig.originationIdentity,
       toPhone: normPhone,
       text: athena.reply,
     });
+    console.log(
+      `[whatsapp-webhook] send OK to=${normPhone} messageId=${sendResult.messageId || "?"} replyLen=${athena.reply.length}`
+    );
 
     conversation.messages.push({
       role: "bot",
@@ -303,7 +314,10 @@ async function processInboundMessage(
     conversation.lastMessageAt = new Date();
     conversation.lastMessagePreview = athena.reply.slice(0, 120);
   } catch (err) {
-    console.error("[whatsapp-webhook] send failed:", err);
+    const e = err as { name?: string; message?: string; $metadata?: { httpStatusCode?: number; requestId?: string } };
+    console.error(
+      `[whatsapp-webhook] send FAILED to=${normPhone} name=${e.name} msg=${e.message} http=${e.$metadata?.httpStatusCode} reqid=${e.$metadata?.requestId}`
+    );
   }
 
   await conversation.save();
@@ -380,6 +394,15 @@ export async function POST(req: NextRequest) {
         "statuses:",
         value.statuses?.length || 0
       );
+
+      for (const status of value.statuses || []) {
+        const errs = (status.errors || []).map(
+          (e) => `${e.code}:${e.title}${e.message ? ` (${e.message})` : ""}${e.error_data?.details ? ` [${e.error_data.details}]` : ""}`
+        );
+        console.log(
+          `[whatsapp-webhook] delivery status id=${status.id} status=${status.status} recipient=${status.recipient_id}${errs.length ? " errors=" + errs.join("; ") : ""}`
+        );
+      }
 
       for (const msg of value.messages || []) {
         const from = msg.from;
