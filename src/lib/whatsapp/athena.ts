@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { IWhatsAppConversation } from "@/models/whatsapp-conversation";
 import type { IWhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 
-const MODEL = "gemini-3.1-flash-lite-preview";
+const MODEL = "gemini-2.5-flash-lite";
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
