@@ -253,10 +253,13 @@ export async function POST(req: NextRequest) {
   const messageType = req.headers.get("x-amz-sns-message-type");
   const rawBody = await req.text();
 
+  console.log("[whatsapp-webhook] raw body:", rawBody.slice(0, 4000));
+
   let envelope: SnsEnvelope;
   try {
     envelope = JSON.parse(rawBody) as SnsEnvelope;
   } catch {
+    console.warn("[whatsapp-webhook] body was not JSON");
     return new Response("Invalid JSON", { status: 200 });
   }
 
@@ -277,32 +280,53 @@ export async function POST(req: NextRequest) {
   }
 
   const innerMessage = envelope.Message;
+  console.log("[whatsapp-webhook] Type:", envelope.Type, "has Message:", !!innerMessage);
+
   if (!innerMessage) {
+    console.warn("[whatsapp-webhook] no Message field in SNS envelope");
     return new Response("OK", { status: 200 });
   }
 
+  console.log("[whatsapp-webhook] inner Message:", innerMessage.slice(0, 4000));
+
   const extracted = extractMetaPayload(innerMessage);
   if (!extracted) {
-    console.warn("[whatsapp-webhook] Could not extract meta payload");
+    console.warn("[whatsapp-webhook] Could not extract meta payload from:", innerMessage.slice(0, 2000));
     return new Response("OK", { status: 200 });
   }
 
   const { payload, phoneNumberId: awsPhoneNumberId } = extracted;
+  console.log("[whatsapp-webhook] extracted phoneNumberId:", awsPhoneNumberId, "entries:", payload.entry?.length || 0);
 
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
       const value = change.value;
-      if (!value) continue;
+      if (!value) {
+        console.log("[whatsapp-webhook] change has no value, field:", change.field);
+        continue;
+      }
 
       const phoneNumberId = awsPhoneNumberId || value.metadata?.phone_number_id || entry.id;
       const contact = value.contacts?.[0];
       const profileName = contact?.profile?.name;
+
+      console.log(
+        "[whatsapp-webhook] change field:",
+        change.field,
+        "phoneNumberId:",
+        phoneNumberId,
+        "messages:",
+        value.messages?.length || 0,
+        "statuses:",
+        value.statuses?.length || 0
+      );
 
       for (const msg of value.messages || []) {
         const from = msg.from;
         if (!from) continue;
 
         const text = extractTextFromMetaMessage(msg);
+        console.log("[whatsapp-webhook] inbound message from:", from, "text:", text.slice(0, 200));
         try {
           await processInboundMessage(phoneNumberId, from, profileName, text, msg.id);
         } catch (err) {
