@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/get-user";
+import { isAdmin } from "@/lib/admin";
 import dbConnect from "@/lib/db";
 import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 import { BotConfigForm } from "@/components/whatsapp/bot-config-form";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function BotConfigPage() {
   const user = await getCurrentUser();
+  if (!isAdmin(user.email)) redirect(`/whatsapp`);
   await dbConnect();
 
   let config = await WhatsAppBotConfig.findOne({ userId: user._id });

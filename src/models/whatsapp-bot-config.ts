@@ -1,7 +1,9 @@
 import mongoose, { Schema, Document } from "mongoose";
+import crypto from "crypto";
 
 export interface IWhatsAppBotConfig extends Document {
   userId: mongoose.Types.ObjectId;
+  botId: string;
   enabled: boolean;
   botName: string;
   businessName: string;
@@ -13,8 +15,13 @@ export interface IWhatsAppBotConfig extends Document {
   autoHandoffOnFrustration: boolean;
   autoHandoffOnPricingObjection: boolean;
   bookingUrl?: string;
+  templateId?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+}
+
+function generateBotId(): string {
+  return `bot_${crypto.randomBytes(6).toString("hex")}`;
 }
 
 const WhatsAppBotConfigSchema = new Schema<IWhatsAppBotConfig>(
@@ -25,6 +32,13 @@ const WhatsAppBotConfigSchema = new Schema<IWhatsAppBotConfig>(
       required: true,
       unique: true,
       index: true,
+    },
+    botId: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      default: generateBotId,
     },
     enabled: { type: Boolean, default: true },
     botName: { type: String, default: "Athena" },
@@ -49,6 +63,7 @@ const WhatsAppBotConfigSchema = new Schema<IWhatsAppBotConfig>(
     autoHandoffOnFrustration: { type: Boolean, default: true },
     autoHandoffOnPricingObjection: { type: Boolean, default: false },
     bookingUrl: String,
+    templateId: { type: Schema.Types.ObjectId, ref: "BotTemplate" },
   },
   { timestamps: true }
 );

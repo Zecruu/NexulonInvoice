@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/get-user";
+import { isAdmin } from "@/lib/admin";
 import dbConnect from "@/lib/db";
 import { WhatsAppConversation } from "@/models/whatsapp-conversation";
+import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Settings2, Sparkles } from "lucide-react";
+import { MessageCircle, Sparkles, Bot } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +32,13 @@ function statusLabel(status: string) {
 
 export default async function WhatsAppPage() {
   const user = await getCurrentUser();
+  const admin = isAdmin(user.email);
   await dbConnect();
+
+  let botConfig = await WhatsAppBotConfig.findOne({ userId: user._id });
+  if (!botConfig) {
+    botConfig = await WhatsAppBotConfig.create({ userId: user._id });
+  }
 
   const conversations = await WhatsAppConversation.find({ userId: user._id })
     .sort({ lastMessageAt: -1 })
@@ -48,6 +56,10 @@ export default async function WhatsAppPage() {
           <p className="text-sm text-muted-foreground">
             Conversations with Athena, your AI lead-qualifier for Accu-Spina.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Bot ID: <span className="font-mono">{botConfig.botId}</span>
+            {" — "}contact Nexulon to configure.
+          </p>
         </div>
         <div className="flex gap-2">
           <Link href="/whatsapp/leads">
@@ -56,12 +68,14 @@ export default async function WhatsAppPage() {
               Leads
             </Button>
           </Link>
-          <Link href="/whatsapp/config">
-            <Button variant="outline" size="sm">
-              <Settings2 className="mr-2 h-4 w-4" />
-              Bot Config
-            </Button>
-          </Link>
+          {admin && (
+            <Link href={`/admin/bots/${botConfig.botId}`}>
+              <Button variant="outline" size="sm">
+                <Bot className="mr-2 h-4 w-4" />
+                Configure bot
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

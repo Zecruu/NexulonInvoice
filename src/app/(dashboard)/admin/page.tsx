@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Shield, Users, Crown, FileText } from "lucide-react";
+import { Shield, Users, Crown, FileText, Bot, BookTemplate } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { UsersTable } from "@/components/admin/users-table";
 import { getAdminStats, getAdminUsers } from "@/actions/admin-actions";
@@ -26,9 +28,25 @@ export default async function AdminPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Users" description="Manage users, tiers, and access">
-        <Shield className="h-5 w-5 text-muted-foreground" />
-      </PageHeader>
+      <div className="flex items-center justify-between">
+        <PageHeader title="Users" description="Manage users, tiers, and access">
+          <Shield className="h-5 w-5 text-muted-foreground" />
+        </PageHeader>
+        <div className="flex gap-2">
+          <Link href="/admin/bots">
+            <Button variant="outline" size="sm">
+              <Bot className="mr-2 h-4 w-4" />
+              Bots
+            </Button>
+          </Link>
+          <Link href="/admin/templates">
+            <Button variant="outline" size="sm">
+              <BookTemplate className="mr-2 h-4 w-4" />
+              Templates
+            </Button>
+          </Link>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
