@@ -210,36 +210,71 @@ async function processInboundMessage(
 
   await conversation.save();
 
-  const athena = await runAthena(conversation, botConfig);
+  const existingLead = await Lead.findOne({
+    userId: botConfig.userId,
+    conversationId: conversation._id,
+  });
+  type StoredSignal = { rule: string; delta: number; evidence: string; timestamp: Date };
+  const priorSignals: StoredSignal[] = (existingLead?.signals || []) as StoredSignal[];
+
+  const athena = await runAthena(conversation, botConfig, priorSignals);
+
+  const emittedRules = new Set(priorSignals.map((s: StoredSignal) => s.rule));
+  const uniqueNewSignals = (athena.newSignals || []).filter(
+    (s) => s.rule && !emittedRules.has(s.rule)
+  );
 
   if (athena.shouldHandoff) {
     conversation.status = "human_handoff";
     conversation.handoffReason = athena.handoffReason;
-  } else if (athena.qualified && athena.leadData) {
-    conversation.temperature = athena.temperature === "unknown" ? "warm" : athena.temperature;
-    conversation.qualificationNotes = athena.leadData.summary;
+  }
 
-    const existingLead = await Lead.findOne({
-      userId: botConfig.userId,
-      conversationId: conversation._id,
-    });
+  if ((athena.qualified && athena.leadData) || uniqueNewSignals.length > 0) {
+    const allSignals = [
+      ...priorSignals.map((s: StoredSignal) => ({
+        rule: s.rule,
+        delta: s.delta,
+        evidence: s.evidence,
+        timestamp: s.timestamp,
+      })),
+      ...uniqueNewSignals.map((s) => ({
+        rule: s.rule,
+        delta: s.delta,
+        evidence: s.evidence,
+        timestamp: new Date(),
+      })),
+    ];
+
+    const signalSum = allSignals.reduce((acc, s) => acc + (s.delta || 0), 0);
+    const computedScore = Math.max(0, Math.min(100, 40 + signalSum));
+
+    let computedTemp: "hot" | "warm" | "cold";
+    if (computedScore >= 70) computedTemp = "hot";
+    else if (computedScore >= 45) computedTemp = "warm";
+    else computedTemp = "cold";
+
+    conversation.temperature = computedTemp;
+    if (athena.leadData?.summary) {
+      conversation.qualificationNotes = athena.leadData.summary;
+    }
 
     const leadPayload = {
       userId: botConfig.userId,
       conversationId: conversation._id,
       waPhone: normPhone,
-      name: athena.leadData.name,
-      temperature: (athena.temperature === "unknown" ? "warm" : athena.temperature) as
-        | "hot"
-        | "warm"
-        | "cold",
-      painDuration: athena.leadData.painDuration,
-      diagnosis: athena.leadData.diagnosis,
-      urgency: athena.leadData.urgency,
-      hasInsurance: athena.leadData.hasInsurance,
-      location: athena.leadData.location,
-      summary: athena.leadData.summary,
-      score: athena.leadData.score ?? 0,
+      name: athena.leadData?.name || existingLead?.name,
+      temperature: computedTemp,
+      painDuration: athena.leadData?.painDuration || existingLead?.painDuration,
+      diagnosis: athena.leadData?.diagnosis || existingLead?.diagnosis,
+      urgency: athena.leadData?.urgency || existingLead?.urgency,
+      hasInsurance:
+        athena.leadData?.hasInsurance !== undefined
+          ? athena.leadData.hasInsurance
+          : existingLead?.hasInsurance,
+      location: athena.leadData?.location || existingLead?.location,
+      summary: athena.leadData?.summary || existingLead?.summary || "",
+      score: computedScore,
+      signals: allSignals,
     };
 
     if (existingLead) {

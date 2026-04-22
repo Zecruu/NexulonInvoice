@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Flame, Snowflake, Thermometer } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { LeadSignalsDialog } from "@/components/whatsapp/lead-signals-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,7 @@ export default async function LeadsPage() {
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Summary</th>
                 <th className="px-4 py-2 font-medium">Score</th>
+                <th className="px-4 py-2 font-medium">Signals</th>
                 <th className="px-4 py-2 font-medium">When</th>
               </tr>
             </thead>
@@ -114,7 +116,42 @@ export default async function LeadsPage() {
                   <td className="max-w-xs px-4 py-3">
                     <p className="line-clamp-2 text-muted-foreground">{l.summary}</p>
                   </td>
-                  <td className="px-4 py-3 font-mono">{l.score}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={
+                            l.score >= 70
+                              ? "h-full bg-red-500"
+                              : l.score >= 45
+                              ? "h-full bg-amber-500"
+                              : "h-full bg-sky-500"
+                          }
+                          style={{ width: `${Math.min(100, Math.max(0, l.score))}%` }}
+                        />
+                      </div>
+                      <span className="font-mono text-xs">{l.score}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <LeadSignalsDialog
+                      name={l.name || l.waPhone}
+                      score={l.score}
+                      signals={(
+                        (l.signals || []) as Array<{
+                          rule: string;
+                          delta: number;
+                          evidence: string;
+                          timestamp: Date | string;
+                        }>
+                      ).map((s) => ({
+                        rule: s.rule,
+                        delta: s.delta,
+                        evidence: s.evidence,
+                        timestamp: String(s.timestamp),
+                      }))}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(l.createdAt), { addSuffix: true })}
                   </td>

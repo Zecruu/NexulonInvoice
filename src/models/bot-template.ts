@@ -50,12 +50,31 @@ export const DEFAULT_ACCU_SPINA_TEMPLATE = {
   name: "Accu-Spina Lead Qualifier",
   slug: "accu-spina-lead-qualifier",
   description:
-    "Qualifies leads for Accu-Spina spinal decompression therapy. Asks about disc diagnosis, pain duration, prior treatments, location, and insurance. Scores hot/warm/cold.",
+    "Qualifies leads for Accu-Spina spinal decompression therapy. Scoring rewards MRI-confirmed disc issues, urgency, and self-pay intent; penalizes insurance shoppers and unrelated cases.",
   category: "medical",
   botName: "Athena",
   systemPromptAddendum: "",
-  qualificationCriteria:
-    "HOT LEAD = disc-related diagnosis (herniated/bulging disc, sciatica, stenosis) + chronic pain (>3 months) + motivated + local.\nWARM LEAD = partial match (some pain but unclear diagnosis).\nCOLD LEAD = unrelated condition, not local, post-surgical, or just browsing.",
+  qualificationCriteria: `LEAD SCORING (operator-set rules — apply via newSignals):
+
+STRONG POSITIVE SIGNALS:
+- "has_mri" (+25): Patient has an MRI of the affected area (cervical or lumbar). MRI confirmation is the strongest signal we have.
+- "urgent_booking" (+12): Patient asks for the next available appointment or wants to start ASAP.
+- "has_herniated_disc" (+15): Patient confirms herniated or bulging disc diagnosis.
+- "chronic_pain_3plus_months" (+10): Pain has lasted 3+ months.
+- "local_to_area" (+8): Patient is in the service area.
+- "not_asking_about_insurance" (+5): After 3+ substantive turns, patient has NOT asked about insurance coverage — signals self-pay intent or high motivation.
+
+NEGATIVE SIGNALS:
+- "asks_about_insurance" (-5): Patient asks "do you take insurance?" or "is this covered?" — signals shopper mode and reduces likelihood of self-pay conversion.
+- "post_surgery" (-10): Already had successful back/spine surgery.
+- "unrelated_condition" (-15): Pain is unrelated to discs (broken bone, muscle strain only, etc).
+- "not_local" (-10): Outside the service area.
+- "just_browsing" (-8): "Just looking", "not ready yet", "curious".
+
+CLASSIFICATION (auto-computed from score; base 40):
+- HOT (score >= 70): prime candidate — flag for immediate outreach.
+- WARM (45-69): promising, needs nurturing.
+- COLD (< 45): unlikely to convert soon.`,
   handoffKeywords: [
     "human",
     "agent",

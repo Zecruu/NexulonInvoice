@@ -9,6 +9,13 @@ export type LeadStatus =
   | "converted"
   | "lost";
 
+export interface ILeadSignal {
+  rule: string;
+  delta: number;
+  evidence: string;
+  timestamp: Date;
+}
+
 export interface ILead extends Document {
   userId: mongoose.Types.ObjectId;
   conversationId: mongoose.Types.ObjectId;
@@ -23,6 +30,7 @@ export interface ILead extends Document {
   location?: string;
   summary: string;
   score: number;
+  signals: ILeadSignal[];
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +71,20 @@ const LeadSchema = new Schema<ILead>(
     location: String,
     summary: { type: String, default: "" },
     score: { type: Number, default: 0 },
+    signals: {
+      type: [
+        new Schema<ILeadSignal>(
+          {
+            rule: { type: String, required: true },
+            delta: { type: Number, required: true },
+            evidence: { type: String, default: "" },
+            timestamp: { type: Date, default: Date.now },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     notes: String,
   },
   { timestamps: true }

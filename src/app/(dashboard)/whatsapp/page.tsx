@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/get-user";
-import { isAdmin } from "@/lib/admin";
 import dbConnect from "@/lib/db";
 import { WhatsAppConversation } from "@/models/whatsapp-conversation";
 import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Sparkles, Bot } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +31,6 @@ function statusLabel(status: string) {
 
 export default async function WhatsAppPage() {
   const user = await getCurrentUser();
-  const admin = isAdmin(user.email);
   await dbConnect();
 
   let botConfig = await WhatsAppBotConfig.findOne({ userId: user._id });
@@ -68,14 +66,6 @@ export default async function WhatsAppPage() {
               Leads
             </Button>
           </Link>
-          {admin && (
-            <Link href={`/admin/bots/${botConfig.botId}`}>
-              <Button variant="outline" size="sm">
-                <Bot className="mr-2 h-4 w-4" />
-                Configure bot
-              </Button>
-            </Link>
-          )}
         </div>
       </div>
 

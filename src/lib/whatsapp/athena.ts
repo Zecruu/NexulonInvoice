@@ -15,6 +15,12 @@ function getClient(): GoogleGenAI {
   return _client;
 }
 
+export interface AthenaSignal {
+  rule: string;
+  delta: number;
+  evidence: string;
+}
+
 export interface AthenaResponse {
   reply: string;
   language: "en" | "es";
@@ -22,6 +28,7 @@ export interface AthenaResponse {
   shouldHandoff: boolean;
   handoffReason?: string;
   qualified: boolean;
+  newSignals?: AthenaSignal[];
   leadData?: {
     name?: string;
     painDuration?: string;
@@ -75,6 +82,23 @@ CONVERSATION RULES:
 
 ${addendum ? `EXTRA INSTRUCTIONS FROM THE OPERATOR:\n${addendum}\n` : ""}
 
+SCORING SIGNALS — when the LATEST customer message contains new evidence, emit a signal in "newSignals". Each signal is one scoring observation: rule name, delta (points +/-), short evidence quote.
+
+Rules you should apply (emit a signal only the FIRST time each applies):
+- "has_mri" — customer mentions having an MRI of cervical/lumbar: +25
+- "has_herniated_disc" — confirms herniated/bulging disc: +15
+- "chronic_pain_3plus_months" — says pain has lasted 3+ months: +10
+- "local_to_area" — confirms local (PR / mentioned city): +8
+- "urgent_booking" — wants appointment ASAP or soonest: +12
+- "not_asking_about_insurance" — has engaged substantively WITHOUT asking about insurance (emit once after 3+ substantive turns): +5
+- "asks_about_insurance" — asks "do you take insurance?", "is this covered?", etc: -5
+- "post_surgery" — already had back/spine surgery: -10
+- "unrelated_condition" — pain is unrelated (broken bone, muscle strain only): -15
+- "not_local" — customer is outside the service area: -10
+- "just_browsing" — says "just looking", "not ready yet", "curious": -8
+
+Do NOT re-emit a signal if the conversation already had it (check the "previous signals" block). Only NEW evidence from the latest customer message.
+
 YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
 {
   "reply": "your conversational reply to the customer",
@@ -82,7 +106,8 @@ YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
   "temperature": "hot" | "warm" | "cold" | "unknown",
   "shouldHandoff": boolean,
   "handoffReason": "short reason if handoff" or null,
-  "qualified": boolean (true once you have enough info to score them),
+  "qualified": boolean (true once you have emitted at least one signal AND learned basic info),
+  "newSignals": [{"rule": "rule_name", "delta": 15, "evidence": "short quote from customer"}] or [],
   "leadData": {
     "name": string or null,
     "painDuration": string or null,
@@ -91,7 +116,7 @@ YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
     "hasInsurance": boolean or null,
     "location": string or null,
     "summary": "1-2 sentence summary of who this lead is",
-    "score": 0-100 integer
+    "score": 0-100 integer (base 40, clamped 0-100; system will recompute from signal sum)
   } or null
 }
 
@@ -149,7 +174,8 @@ function fallbackReply(
 
 export async function runAthena(
   conversation: IWhatsAppConversation,
-  config: IWhatsAppBotConfig
+  config: IWhatsAppBotConfig,
+  priorSignals: Array<{ rule: string; delta: number; evidence: string }> = []
 ): Promise<AthenaResponse> {
   const latestCustomerMsg = [...conversation.messages]
     .reverse()
@@ -163,7 +189,12 @@ export async function runAthena(
   try {
     const system = buildSystemPrompt(config, conversation);
     const convo = buildConversationText(conversation);
-    const prompt = `${system}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
+    const priorSignalsBlock =
+      priorSignals.length > 0
+        ? `Previous signals already emitted (do NOT re-emit):\n${priorSignals.map((s) => `- ${s.rule} (${s.delta >= 0 ? "+" : ""}${s.delta})`).join("\n")}`
+        : "Previous signals already emitted: (none yet)";
+
+    const prompt = `${system}\n\n${priorSignalsBlock}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
 
     const response = await getClient().models.generateContent({
       model: MODEL,
