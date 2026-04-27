@@ -5,6 +5,7 @@ import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 import { Lead } from "@/models/lead";
 import { runAthena } from "@/lib/whatsapp/athena";
 import { sendWhatsAppText, normalizePhone } from "@/lib/whatsapp/send";
+import { downloadAndStoreMedia, pickMediaFromMessage } from "@/lib/whatsapp/media";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -122,9 +123,29 @@ function extractTextFromMetaMessage(msg: NonNullable<MetaValue["messages"]>[numb
   if (msg.button?.text) return msg.button.text;
   if (msg.interactive?.button_reply?.title) return msg.interactive.button_reply.title;
   if (msg.interactive?.list_reply?.title) return msg.interactive.list_reply.title;
-  if (msg.type === "image") return "[image]";
-  if (msg.type === "audio") return "[audio]";
-  if (msg.type === "document") return `[document: ${msg.document?.filename || ""}]`;
+
+  const m = msg as NonNullable<MetaValue["messages"]>[number] & {
+    image?: { caption?: string };
+    video?: { caption?: string };
+    document?: { caption?: string; filename?: string };
+    audio?: { voice?: boolean };
+  };
+  if (msg.type === "image") {
+    return m.image?.caption ? `[image: ${m.image.caption}]` : "[image]";
+  }
+  if (msg.type === "audio") {
+    return m.audio?.voice ? "[voice note]" : "[audio]";
+  }
+  if (msg.type === "video") {
+    return m.video?.caption ? `[video: ${m.video.caption}]` : "[video]";
+  }
+  if (msg.type === "document") {
+    const parts: string[] = [];
+    if (m.document?.filename) parts.push(m.document.filename);
+    if (m.document?.caption) parts.push(m.document.caption);
+    return `[document${parts.length ? ": " + parts.join(" — ") : ""}]`;
+  }
+  if (msg.type === "sticker") return "[sticker]";
   return "[unsupported message type]";
 }
 
@@ -143,7 +164,8 @@ async function processInboundMessage(
   customerPhone: string,
   profileName: string | undefined,
   messageText: string,
-  waMessageId: string | undefined
+  waMessageId: string | undefined,
+  rawMsg?: NonNullable<MetaValue["messages"]>[number]
 ): Promise<void> {
   let botConfig = phoneNumberId
     ? await WhatsAppBotConfig.findOne({ phoneNumberId })
@@ -191,10 +213,35 @@ async function processInboundMessage(
     conversation.profileName = profileName;
   }
 
+  // Detect + download media if present
+  let mediaUrl: string | undefined;
+  let mediaType: string | undefined;
+  if (rawMsg) {
+    const picked = pickMediaFromMessage(rawMsg);
+    if (picked) {
+      console.log(
+        `[whatsapp-webhook] downloading ${picked.category} media id=${picked.info.id}`
+      );
+      const stored = await downloadAndStoreMedia(
+        picked.info.id,
+        picked.category,
+        String(conversation._id),
+        picked.info.filename
+      );
+      if (stored) {
+        mediaUrl = stored.url;
+        mediaType = stored.mimeType;
+        console.log(`[whatsapp-webhook] stored media at ${stored.url} (${stored.size} bytes)`);
+      }
+    }
+  }
+
   conversation.messages.push({
     role: "customer",
     content: messageText,
     waMessageId,
+    mediaUrl,
+    mediaType,
     timestamp: new Date(),
   });
   conversation.lastCustomerMessageAt = new Date();
@@ -452,9 +499,11 @@ export async function POST(req: NextRequest) {
         if (!from) continue;
 
         const text = extractTextFromMetaMessage(msg);
-        console.log("[whatsapp-webhook] inbound message from:", from, "text:", text.slice(0, 200));
+        console.log(
+          `[whatsapp-webhook] inbound from=${from} type=${msg.type} text=${text.slice(0, 200)}`
+        );
         try {
-          await processInboundMessage(phoneNumberId, from, profileName, text, msg.id);
+          await processInboundMessage(phoneNumberId, from, profileName, text, msg.id, msg);
         } catch (err) {
           console.error("[whatsapp-webhook] processInboundMessage failed:", err);
         }

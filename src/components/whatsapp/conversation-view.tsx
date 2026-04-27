@@ -6,12 +6,58 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Bot, UserRound, HeadsetIcon, Hand, Play } from "lucide-react";
+import { Bot, UserRound, HeadsetIcon, Hand, Play, FileText, Download } from "lucide-react";
 
 interface Message {
   role: "customer" | "bot" | "human";
   content: string;
   timestamp: string;
+  mediaUrl?: string;
+  mediaType?: string;
+}
+
+function MessageMedia({ url, mime }: { url: string; mime?: string }) {
+  if (!url) return null;
+  const t = (mime || "").toLowerCase();
+
+  if (t.startsWith("image/")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="mt-1 block">
+        <img
+          src={url}
+          alt="attachment"
+          className="max-h-64 w-auto rounded-md object-cover"
+        />
+      </a>
+    );
+  }
+  if (t.startsWith("video/")) {
+    return (
+      <video
+        src={url}
+        controls
+        className="mt-1 max-h-64 w-full rounded-md"
+        preload="metadata"
+      />
+    );
+  }
+  if (t.startsWith("audio/")) {
+    return <audio src={url} controls className="mt-1 w-full" preload="metadata" />;
+  }
+  // document / fallback — show download chip
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-1 inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent"
+    >
+      <FileText className="h-3.5 w-3.5" />
+      Open attachment
+      <Download className="h-3 w-3" />
+    </a>
+  );
 }
 
 interface Conversation {
@@ -175,6 +221,7 @@ export function ConversationView({ conversation: initial, waPhone }: Props) {
                 )}
               >
                 <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                {m.mediaUrl && <MessageMedia url={m.mediaUrl} mime={m.mediaType} />}
                 <p className="mt-1 text-[10px] opacity-70">
                   {m.role === "bot" && "Athena · "}
                   {m.role === "human" && "You · "}
