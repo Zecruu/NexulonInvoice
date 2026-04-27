@@ -1,30 +1,3 @@
-import {
-  SocialMessagingClient,
-  SendWhatsAppMessageCommand,
-} from "@aws-sdk/client-socialmessaging";
-
-let _client: SocialMessagingClient | null = null;
-
-function getClient(): SocialMessagingClient {
-  if (!_client) {
-    const region = process.env.AWS_SOCIAL_MESSAGING_REGION || "us-east-1";
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-
-    if (!accessKeyId || !secretAccessKey) {
-      throw new Error(
-        "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set"
-      );
-    }
-
-    _client = new SocialMessagingClient({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-  }
-  return _client;
-}
-
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("1") && digits.length === 11) return `+${digits}`;
@@ -38,24 +11,54 @@ interface SendWhatsAppTextOptions {
   text: string;
 }
 
+const META_API_VERSION = "v20.0";
+
 export async function sendWhatsAppText(
   opts: SendWhatsAppTextOptions
 ): Promise<{ messageId?: string }> {
-  const to = normalizePhone(opts.toPhone);
+  const token = process.env.META_GRAPH_ACCESS_TOKEN;
+  if (!token) {
+    throw new Error("META_GRAPH_ACCESS_TOKEN is not set");
+  }
 
-  const payload = {
+  const phoneNumberId = opts.originationIdentity;
+  if (!phoneNumberId) {
+    throw new Error("originationIdentity (Meta phone_number_id) is required");
+  }
+
+  const to = normalizePhone(opts.toPhone).replace(/^\+/, "");
+
+  const body = {
     messaging_product: "whatsapp",
+    recipient_type: "individual",
     to,
     type: "text",
-    text: { body: opts.text },
+    text: { preview_url: false, body: opts.text },
   };
 
-  const command = new SendWhatsAppMessageCommand({
-    originationPhoneNumberId: opts.originationIdentity,
-    message: new TextEncoder().encode(JSON.stringify(payload)),
-    metaApiVersion: "v20.0",
-  });
+  const res = await fetch(
+    `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    }
+  );
 
-  const result = await getClient().send(command);
-  return { messageId: result.messageId };
+  const json = (await res.json()) as {
+    messages?: Array<{ id?: string }>;
+    error?: { code?: number; message?: string; error_data?: { details?: string } };
+  };
+
+  if (!res.ok || json.error) {
+    const e = json.error;
+    throw new Error(
+      `Meta send failed (${res.status}): ${e?.code || ""} ${e?.message || ""} ${e?.error_data?.details || ""}`.trim()
+    );
+  }
+
+  return { messageId: json.messages?.[0]?.id };
 }

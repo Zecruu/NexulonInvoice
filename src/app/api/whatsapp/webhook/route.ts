@@ -329,19 +329,20 @@ export async function POST(req: NextRequest) {
 
   console.log("[whatsapp-webhook] raw body:", rawBody.slice(0, 4000));
 
-  let envelope: SnsEnvelope;
+  let parsedBody: unknown;
   try {
-    envelope = JSON.parse(rawBody) as SnsEnvelope;
+    parsedBody = JSON.parse(rawBody);
   } catch {
     console.warn("[whatsapp-webhook] body was not JSON");
     return new Response("Invalid JSON", { status: 200 });
   }
 
-  if (messageType === "SubscriptionConfirmation" || envelope.Type === "SubscriptionConfirmation") {
+  // Handle SNS-wrapped payloads (legacy AWS End User Messaging path)
+  const envelope = parsedBody as SnsEnvelope;
+  if (envelope.Type === "SubscriptionConfirmation" || messageType === "SubscriptionConfirmation") {
     await handleSubscriptionConfirmation(envelope);
     return new Response("OK", { status: 200 });
   }
-
   if (messageType === "UnsubscribeConfirmation") {
     return new Response("OK", { status: 200 });
   }
@@ -353,24 +354,34 @@ export async function POST(req: NextRequest) {
     return new Response("OK", { status: 200 });
   }
 
-  const innerMessage = envelope.Message;
-  console.log("[whatsapp-webhook] Type:", envelope.Type, "has Message:", !!innerMessage);
+  // Detect payload variant:
+  //   - SNS envelope: top-level has Type=Notification + Message string
+  //   - Meta direct: top-level has object="whatsapp_business_account" + entry array
+  const isSnsEnvelope = envelope.Type === "Notification" && typeof envelope.Message === "string";
+  let payload: MetaPayload | null = null;
+  let phoneNumberIdFromAws: string | undefined;
 
-  if (!innerMessage) {
-    console.warn("[whatsapp-webhook] no Message field in SNS envelope");
-    return new Response("OK", { status: 200 });
+  if (isSnsEnvelope) {
+    const innerMessage = envelope.Message;
+    if (!innerMessage) return new Response("OK", { status: 200 });
+    console.log("[whatsapp-webhook] inner Message:", innerMessage.slice(0, 4000));
+    const extracted = extractMetaPayload(innerMessage);
+    if (!extracted) {
+      console.warn("[whatsapp-webhook] Could not extract meta payload from SNS envelope");
+      return new Response("OK", { status: 200 });
+    }
+    payload = extracted.payload;
+    phoneNumberIdFromAws = extracted.phoneNumberId;
+  } else {
+    // Meta direct webhook
+    payload = parsedBody as MetaPayload;
+    if (!Array.isArray(payload.entry)) {
+      console.warn("[whatsapp-webhook] Direct Meta payload missing entry[]");
+      return new Response("OK", { status: 200 });
+    }
   }
 
-  console.log("[whatsapp-webhook] inner Message:", innerMessage.slice(0, 4000));
-
-  const extracted = extractMetaPayload(innerMessage);
-  if (!extracted) {
-    console.warn("[whatsapp-webhook] Could not extract meta payload from:", innerMessage.slice(0, 2000));
-    return new Response("OK", { status: 200 });
-  }
-
-  const { payload, phoneNumberId: awsPhoneNumberId } = extracted;
-  console.log("[whatsapp-webhook] extracted phoneNumberId:", awsPhoneNumberId, "entries:", payload.entry?.length || 0);
+  console.log("[whatsapp-webhook] processing entries:", payload.entry?.length || 0, "via", isSnsEnvelope ? "SNS" : "Meta-direct");
 
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
@@ -380,7 +391,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const phoneNumberId = awsPhoneNumberId || value.metadata?.phone_number_id || entry.id;
+      const phoneNumberId = phoneNumberIdFromAws || value.metadata?.phone_number_id || entry.id;
       const contact = value.contacts?.[0];
       const profileName = contact?.profile?.name;
 
@@ -422,6 +433,22 @@ export async function POST(req: NextRequest) {
   return new Response("OK", { status: 200 });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
+
+  // Meta webhook URL verification handshake
+  if (mode === "subscribe" && challenge) {
+    const expected = process.env.META_WEBHOOK_VERIFY_TOKEN;
+    if (expected && token === expected) {
+      console.log("[whatsapp-webhook] Meta webhook verification SUCCESS");
+      return new Response(challenge, { status: 200 });
+    }
+    console.warn("[whatsapp-webhook] Meta webhook verification FAILED — token mismatch");
+    return new Response("Forbidden", { status: 403 });
+  }
+
   return new Response("WhatsApp webhook is live", { status: 200 });
 }
