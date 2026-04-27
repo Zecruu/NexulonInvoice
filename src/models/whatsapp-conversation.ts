@@ -20,6 +20,20 @@ export interface IWhatsAppMessage {
   timestamp: Date;
 }
 
+export interface IPatientContext {
+  painLevel?: number;
+  painLocation?: string;
+  painDuration?: string;
+  hasMRI?: boolean;
+  diagnosis?: string;
+  priorTreatments?: string[];
+  urgency?: string;
+  hasInsurance?: boolean;
+  location?: string;
+  intakeSummary?: string;
+  lastUpdated?: Date;
+}
+
 export interface IWhatsAppConversation extends Document {
   userId: mongoose.Types.ObjectId;
   waPhone: string;
@@ -31,6 +45,7 @@ export interface IWhatsAppConversation extends Document {
   unread: boolean;
   unreadCount: number;
   messages: IWhatsAppMessage[];
+  patientContext: IPatientContext;
   lastCustomerMessageAt?: Date;
   lastBotMessageAt?: Date;
   lastMessageAt: Date;
@@ -95,6 +110,25 @@ const WhatsAppConversationSchema = new Schema<IWhatsAppConversation>(
     unread: { type: Boolean, default: true, index: true },
     unreadCount: { type: Number, default: 0 },
     messages: { type: [MessageSchema], default: [] },
+    patientContext: {
+      type: new Schema<IPatientContext>(
+        {
+          painLevel: { type: Number, min: 0, max: 10 },
+          painLocation: String,
+          painDuration: String,
+          hasMRI: Boolean,
+          diagnosis: String,
+          priorTreatments: { type: [String], default: undefined },
+          urgency: String,
+          hasInsurance: Boolean,
+          location: String,
+          intakeSummary: { type: String, default: "" },
+          lastUpdated: Date,
+        },
+        { _id: false }
+      ),
+      default: () => ({}),
+    },
     lastCustomerMessageAt: Date,
     lastBotMessageAt: Date,
     lastMessageAt: { type: Date, default: Date.now, index: true },

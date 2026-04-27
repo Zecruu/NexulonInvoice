@@ -266,20 +266,32 @@ async function processInboundMessage(
       conversation.qualificationNotes = athena.leadData.summary;
     }
 
+    const ctx = athena.patientContext || {};
     const leadPayload = {
       userId: botConfig.userId,
       conversationId: conversation._id,
       waPhone: normPhone,
       name: athena.leadData?.name || existingLead?.name,
       temperature: computedTemp,
-      painDuration: athena.leadData?.painDuration || existingLead?.painDuration,
-      diagnosis: athena.leadData?.diagnosis || existingLead?.diagnosis,
-      urgency: athena.leadData?.urgency || existingLead?.urgency,
+      painLevel: ctx.painLevel ?? existingLead?.painLevel,
+      painLocation: ctx.painLocation || existingLead?.painLocation,
+      painDuration:
+        ctx.painDuration || athena.leadData?.painDuration || existingLead?.painDuration,
+      diagnosis: ctx.diagnosis || athena.leadData?.diagnosis || existingLead?.diagnosis,
+      hasMRI: ctx.hasMRI !== undefined ? ctx.hasMRI : existingLead?.hasMRI,
+      priorTreatments:
+        ctx.priorTreatments && ctx.priorTreatments.length > 0
+          ? ctx.priorTreatments
+          : existingLead?.priorTreatments,
+      urgency: ctx.urgency || athena.leadData?.urgency || existingLead?.urgency,
       hasInsurance:
-        athena.leadData?.hasInsurance !== undefined
+        ctx.hasInsurance !== undefined
+          ? ctx.hasInsurance
+          : athena.leadData?.hasInsurance !== undefined
           ? athena.leadData.hasInsurance
           : existingLead?.hasInsurance,
-      location: athena.leadData?.location || existingLead?.location,
+      location: ctx.location || athena.leadData?.location || existingLead?.location,
+      intakeSummary: ctx.intakeSummary || existingLead?.intakeSummary || "",
       summary: athena.leadData?.summary || existingLead?.summary || "",
       score: computedScore,
       signals: allSignals,
@@ -291,6 +303,26 @@ async function processInboundMessage(
     } else {
       await Lead.create(leadPayload);
     }
+  }
+
+  // Mirror patient context onto the conversation so handoff humans see it without joining
+  if (athena.patientContext) {
+    const ctx = athena.patientContext;
+    const current = (conversation.patientContext || {}) as Record<string, unknown>;
+    const merged: Record<string, unknown> = { ...current };
+    if (ctx.painLevel !== undefined) merged.painLevel = ctx.painLevel;
+    if (ctx.painLocation) merged.painLocation = ctx.painLocation;
+    if (ctx.painDuration) merged.painDuration = ctx.painDuration;
+    if (ctx.hasMRI !== undefined) merged.hasMRI = ctx.hasMRI;
+    if (ctx.diagnosis) merged.diagnosis = ctx.diagnosis;
+    if (ctx.priorTreatments && ctx.priorTreatments.length > 0)
+      merged.priorTreatments = ctx.priorTreatments;
+    if (ctx.urgency) merged.urgency = ctx.urgency;
+    if (ctx.hasInsurance !== undefined) merged.hasInsurance = ctx.hasInsurance;
+    if (ctx.location) merged.location = ctx.location;
+    if (ctx.intakeSummary) merged.intakeSummary = ctx.intakeSummary;
+    merged.lastUpdated = new Date();
+    (conversation as unknown as { patientContext: unknown }).patientContext = merged;
   }
 
   conversation.language = athena.language;

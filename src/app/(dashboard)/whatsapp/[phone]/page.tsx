@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
 import { ConversationView } from "@/components/whatsapp/conversation-view";
+import { PatientContextCard } from "@/components/whatsapp/patient-context-card";
+import { DeleteConversationButton } from "@/components/whatsapp/delete-conversation-button";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +67,15 @@ export default async function ConversationPage({
         >
           {conversation.temperature}
         </Badge>
+        <DeleteConversationButton waPhone={waPhone} />
       </div>
 
-      <ConversationView conversation={conversation} waPhone={waPhone} />
+      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+        <ConversationView conversation={conversation} waPhone={waPhone} />
+        <div className="space-y-4">
+          <PatientContextCard context={conversation.patientContext} />
+        </div>
+      </div>
     </div>
   );
 }

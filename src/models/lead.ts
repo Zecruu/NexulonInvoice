@@ -23,11 +23,16 @@ export interface ILead extends Document {
   name?: string;
   temperature: LeadTemperature;
   status: LeadStatus;
+  painLevel?: number;
+  painLocation?: string;
   painDuration?: string;
   diagnosis?: string;
+  hasMRI?: boolean;
+  priorTreatments?: string[];
   urgency?: string;
   hasInsurance?: boolean;
   location?: string;
+  intakeSummary?: string;
   summary: string;
   score: number;
   signals: ILeadSignal[];
@@ -64,11 +69,16 @@ const LeadSchema = new Schema<ILead>(
       default: "new",
       index: true,
     },
+    painLevel: { type: Number, min: 0, max: 10 },
+    painLocation: String,
     painDuration: String,
     diagnosis: String,
+    hasMRI: Boolean,
+    priorTreatments: { type: [String], default: undefined },
     urgency: String,
     hasInsurance: Boolean,
     location: String,
+    intakeSummary: { type: String, default: "" },
     summary: { type: String, default: "" },
     score: { type: Number, default: 0 },
     signals: {

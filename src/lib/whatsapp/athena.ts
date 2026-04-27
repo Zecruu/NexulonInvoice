@@ -21,6 +21,19 @@ export interface AthenaSignal {
   evidence: string;
 }
 
+export interface AthenaPatientContext {
+  painLevel?: number;
+  painLocation?: string;
+  painDuration?: string;
+  hasMRI?: boolean;
+  diagnosis?: string;
+  priorTreatments?: string[];
+  urgency?: string;
+  hasInsurance?: boolean;
+  location?: string;
+  intakeSummary?: string;
+}
+
 export interface AthenaResponse {
   reply: string;
   language: "en" | "es";
@@ -29,6 +42,7 @@ export interface AthenaResponse {
   handoffReason?: string;
   qualified: boolean;
   newSignals?: AthenaSignal[];
+  patientContext?: AthenaPatientContext;
   leadData?: {
     name?: string;
     painDuration?: string;
@@ -58,11 +72,13 @@ Your single purpose is to qualify leads for Accu-Spina spinal decompression ther
 
 QUALIFYING QUESTIONS (ask naturally over the course of the chat, not all at once):
 1. What pain or condition are they dealing with? (herniated disc, sciatica, chronic back pain, etc.)
-2. How long have they had it?
-3. Have they tried other treatments (PT, chiro, injections, surgery)?
-4. Do they have a diagnosis or MRI?
-5. How urgent — are they in daily pain or looking to prevent worsening?
-6. Are they local to the area? Do they have insurance?
+2. Where exactly does it hurt — cervical (neck), lumbar (lower back), or thoracic?
+3. **What's their pain level on a 1-10 scale?** Always ask this — it's required for handoff.
+4. How long have they had it?
+5. Have they tried other treatments (PT, chiro, injections, surgery)?
+6. Do they have a diagnosis or MRI?
+7. How urgent — are they in daily pain or looking to prevent worsening?
+8. Are they local to the area? Do they have insurance?
 
 HOT LEAD = has a disc-related diagnosis (herniated/bulging disc, sciatica, stenosis) + chronic pain (>3 months) + motivated to try something new + local.
 WARM LEAD = partial match (some pain but unclear diagnosis, or unsure about commitment).
@@ -96,8 +112,13 @@ Rules you should apply (emit a signal only the FIRST time each applies):
 - "unrelated_condition" — pain is unrelated (broken bone, muscle strain only): -15
 - "not_local" — customer is outside the service area: -10
 - "just_browsing" — says "just looking", "not ready yet", "curious": -8
+- "pain_level_severe" — patient reports pain 8-10 out of 10: +10
+- "pain_level_moderate" — patient reports pain 5-7 out of 10: +4
+- "pain_level_mild" — patient reports pain 1-4 out of 10: -3
 
 Do NOT re-emit a signal if the conversation already had it (check the "previous signals" block). Only NEW evidence from the latest customer message.
+
+PATIENT CONTEXT — fill in any field as you learn it. This is a structured intake form humans see when they take over the conversation. Only include fields you have learned; omit unknowns.
 
 YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
 {
@@ -108,6 +129,18 @@ YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
   "handoffReason": "short reason if handoff" or null,
   "qualified": boolean (true once you have emitted at least one signal AND learned basic info),
   "newSignals": [{"rule": "rule_name", "delta": 15, "evidence": "short quote from customer"}] or [],
+  "patientContext": {
+    "painLevel": integer 1-10 or null,
+    "painLocation": "cervical" | "lumbar" | "thoracic" | "multiple" | string description or null,
+    "painDuration": string or null,
+    "hasMRI": true | false | null,
+    "diagnosis": string or null (e.g. "L4-L5 herniated disc"),
+    "priorTreatments": [string] or null (e.g. ["PT", "chiro", "epidural injection"]),
+    "urgency": "high" | "medium" | "low" or null,
+    "hasInsurance": true | false | null,
+    "location": string or null,
+    "intakeSummary": "2-4 sentence narrative summary suitable for a human agent to read at a glance — written in third person, neutral tone, no markdown. Update this every turn."
+  },
   "leadData": {
     "name": string or null,
     "painDuration": string or null,
@@ -120,7 +153,8 @@ YOU MUST RESPOND IN STRICT JSON — nothing else. Schema:
   } or null
 }
 
-Only populate leadData once you have meaningful information. Before that, set it to null.`;
+Only populate leadData once you have meaningful information. Before that, set it to null.
+Always populate patientContext (even if mostly nulls early on) — and ALWAYS regenerate intakeSummary based on what you know so far.`;
 }
 
 function buildConversationText(conversation: IWhatsAppConversation): string {
