@@ -187,9 +187,19 @@ function buildConversationText(conversation: IWhatsAppConversation): string {
     .join("\n");
 }
 
-function detectLanguage(text: string): "en" | "es" {
-  const spanishMarkers = /\b(hola|buenos|buenas|gracias|por favor|dolor|espalda|cuello|disco|hernia|cuánto|cuanto|cómo|como|sí|si no|ayuda|tengo|estoy|soy|me duele|quiero|necesito|puede|puedes|para|eres|está|estás)\b/i;
-  return spanishMarkers.test(text) ? "es" : "en";
+export function detectLanguageFromText(text: string): "en" | "es" {
+  const t = (text || "").trim().toLowerCase();
+  if (!t) return "en";
+
+  // Strong Spanish markers — single word triggers
+  const spanishWords = /\b(hola|buenos|buenas|gracias|por favor|dolor|espalda|cuello|disco|hernia|cuánto|cuanto|cómo|como|sí|si no|ayuda|tengo|estoy|soy|me duele|quiero|necesito|puede|puedes|para|eres|está|estás|qué|que|cuándo|cuando|dónde|donde|años|año|mes|meses|semana|día|días|todos|todo|nada|ningún|también|tambien|pero|aunque|porque|porqué|cuanto cuesta|cuál|cual|saludos|adiós|adios|hasta luego|sí señor|no señor|usted|ustedes|nosotros|nuestro|gracias por|de nada|por nada)\b/i;
+  if (spanishWords.test(t)) return "es";
+
+  // Diacritics often imply Spanish (ñ, á, é, í, ó, ú, ü, ¿, ¡)
+  if (/[ñáéíóúü¿¡]/i.test(t)) return "es";
+
+  // Otherwise default English
+  return "en";
 }
 
 function fallbackKeywordCheck(
@@ -209,7 +219,7 @@ function fallbackReply(
   latestText: string,
   config: IWhatsAppBotConfig
 ): AthenaResponse {
-  const lang = detectLanguage(latestText);
+  const lang = detectLanguageFromText(latestText);
   const kw = fallbackKeywordCheck(latestText, config);
   const reply =
     lang === "es"
@@ -281,7 +291,7 @@ export async function runAthena(
       parsed.handoffReason = parsed.handoffReason || kwCheck.reason;
     }
 
-    parsed.language = parsed.language || detectLanguage(latestText);
+    parsed.language = parsed.language || detectLanguageFromText(latestText);
 
     return parsed;
   } catch (err) {

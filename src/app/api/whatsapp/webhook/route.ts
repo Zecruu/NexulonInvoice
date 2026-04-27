@@ -3,7 +3,7 @@ import dbConnect from "@/lib/db";
 import { WhatsAppConversation } from "@/models/whatsapp-conversation";
 import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 import { Lead } from "@/models/lead";
-import { runAthena } from "@/lib/whatsapp/athena";
+import { runAthena, detectLanguageFromText } from "@/lib/whatsapp/athena";
 import { sendWhatsAppText, normalizePhone } from "@/lib/whatsapp/send";
 import { downloadAndStoreMedia, pickMediaFromMessage } from "@/lib/whatsapp/media";
 
@@ -195,13 +195,18 @@ async function processInboundMessage(
     waPhone: normPhone,
   });
 
+  // Detect language from THIS customer message (greeting "Hola" = es, "Hello" = en).
+  // For new conversations, this becomes the locked language. For existing, only override
+  // when we have strong evidence the customer switched.
+  const detectedLang = detectLanguageFromText(messageText);
+
   if (!conversation) {
     conversation = await WhatsAppConversation.create({
       userId: botConfig.userId,
       waPhone: normPhone,
       profileName,
       status: "active",
-      language: "en",
+      language: detectedLang,
       temperature: "unknown",
       unread: true,
       unreadCount: 0,
@@ -209,8 +214,18 @@ async function processInboundMessage(
       lastMessagePreview: "",
       lastMessageAt: new Date(),
     });
-  } else if (profileName && !conversation.profileName) {
-    conversation.profileName = profileName;
+  } else {
+    if (profileName && !conversation.profileName) {
+      conversation.profileName = profileName;
+    }
+    // Only override existing language if the very first customer message in conversation
+    // is the one we're processing (i.e. conversation has no customer messages yet)
+    const hasPriorCustomerMsg = (conversation.messages || []).some(
+      (m: { role: string }) => m.role === "customer"
+    );
+    if (!hasPriorCustomerMsg) {
+      conversation.language = detectedLang;
+    }
   }
 
   // Detect + download media if present
