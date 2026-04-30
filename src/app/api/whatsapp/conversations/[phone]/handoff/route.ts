@@ -21,7 +21,7 @@ export async function POST(
     const reason: string | undefined = typeof body.reason === "string" ? body.reason : undefined;
 
     const conversation = await WhatsAppConversation.findOne({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       waPhone,
     });
     if (!conversation) return new Response("Not found", { status: 404 });

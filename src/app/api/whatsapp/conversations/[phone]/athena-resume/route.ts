@@ -22,8 +22,12 @@ export async function POST(
     const { phone } = await params;
     const waPhone = normalizePhone(decodeURIComponent(phone));
 
+    const scope = user.companyId
+      ? { companyId: user.companyId }
+      : { userId: user._id };
+
     const conversation = await WhatsAppConversation.findOne({
-      userId: user._id,
+      ...scope,
       waPhone,
     });
     if (!conversation) return new Response("Not found", { status: 404 });
@@ -35,13 +39,13 @@ export async function POST(
       );
     }
 
-    const botConfig = await WhatsAppBotConfig.findOne({ userId: user._id });
+    const botConfig = await WhatsAppBotConfig.findOne(scope);
     if (!botConfig || !botConfig.originationIdentity) {
       return new Response("Bot is not configured (missing originationIdentity).", { status: 400 });
     }
 
     const existingLead = await Lead.findOne({
-      userId: user._id,
+      ...scope,
       conversationId: conversation._id,
     });
     const priorSignals: StoredSignal[] =
@@ -108,6 +112,7 @@ export async function POST(
       const ctx = athena.patientContext || {};
       const leadPayload = {
         userId: user._id,
+        companyId: user.companyId,
         conversationId: conversation._id,
         waPhone,
         name: athena.leadData?.name || existingLead?.name,

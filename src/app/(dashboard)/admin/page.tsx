@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Shield, Users, Crown, FileText, Bot, BookTemplate } from "lucide-react";
+import { Shield, Users, Crown, FileText, Bot, BookTemplate, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
@@ -33,6 +33,12 @@ export default async function AdminPage({
           <Shield className="h-5 w-5 text-muted-foreground" />
         </PageHeader>
         <div className="flex gap-2">
+          <Link href="/admin/companies">
+            <Button variant="outline" size="sm">
+              <Building2 className="mr-2 h-4 w-4" />
+              Companies
+            </Button>
+          </Link>
           <Link href="/admin/bots">
             <Button variant="outline" size="sm">
               <Bot className="mr-2 h-4 w-4" />

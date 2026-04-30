@@ -19,7 +19,7 @@ export async function GET(
     const waPhone = normalizePhone(decodeURIComponent(phone));
 
     const conversation = await WhatsAppConversation.findOne({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       waPhone,
     }).lean();
 
@@ -45,10 +45,13 @@ export async function DELETE(
     const { phone } = await params;
     const waPhone = normalizePhone(decodeURIComponent(phone));
 
-    const conv = await WhatsAppConversation.findOne({ userId: user._id, waPhone });
+    const scope = user.companyId
+      ? { companyId: user.companyId }
+      : { userId: user._id };
+    const conv = await WhatsAppConversation.findOne({ ...scope, waPhone });
     if (!conv) return new Response("Not found", { status: 404 });
 
-    await Lead.deleteMany({ userId: user._id, conversationId: conv._id });
+    await Lead.deleteMany({ ...scope, conversationId: conv._id });
     await conv.deleteOne();
 
     return NextResponse.json({ success: true });
@@ -71,7 +74,7 @@ export async function PATCH(
     const body = await req.json();
 
     const conversation = await WhatsAppConversation.findOne({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       waPhone,
     });
     if (!conversation) return new Response("Not found", { status: 404 });

@@ -18,6 +18,7 @@ export interface ILeadSignal {
 
 export interface ILead extends Document {
   userId: mongoose.Types.ObjectId;
+  companyId?: mongoose.Types.ObjectId;
   conversationId: mongoose.Types.ObjectId;
   waPhone: string;
   name?: string;
@@ -47,6 +48,11 @@ const LeadSchema = new Schema<ILead>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
+    },
+    companyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Company",
       index: true,
     },
     conversationId: {

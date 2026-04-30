@@ -23,12 +23,14 @@ export async function POST(
     if (!text) return new Response("Empty message", { status: 400 });
 
     const conversation = await WhatsAppConversation.findOne({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       waPhone,
     });
     if (!conversation) return new Response("Not found", { status: 404 });
 
-    const botConfig = await WhatsAppBotConfig.findOne({ userId: user._id });
+    const botConfig = await WhatsAppBotConfig.findOne(
+      user.companyId ? { companyId: user.companyId } : { userId: user._id }
+    );
     if (!botConfig || !botConfig.originationIdentity) {
       return new Response("Bot not configured", { status: 400 });
     }

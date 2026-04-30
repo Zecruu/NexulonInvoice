@@ -10,7 +10,7 @@ export async function GET() {
     const user = await getCurrentUser();
     await dbConnect();
     const count = await WhatsAppConversation.countDocuments({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       unread: true,
     });
     return NextResponse.json({ count });

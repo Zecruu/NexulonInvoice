@@ -24,6 +24,9 @@ export interface IUser extends Document {
   banned?: boolean;
   bannedAt?: Date;
   bannedReason?: string;
+  companyId?: mongoose.Types.ObjectId;
+  companyRole?: "owner" | "admin" | "member";
+  joinedCompanyAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +56,13 @@ const UserSchema = new Schema<IUser>(
     banned: { type: Boolean, default: false, index: true },
     bannedAt: Date,
     bannedReason: String,
+    companyId: { type: Schema.Types.ObjectId, ref: "Company", index: true },
+    companyRole: {
+      type: String,
+      enum: ["owner", "admin", "member"],
+      default: "member",
+    },
+    joinedCompanyAt: Date,
   },
   { timestamps: true }
 );

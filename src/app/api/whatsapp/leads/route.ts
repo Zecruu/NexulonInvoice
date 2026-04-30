@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
     const temperature = searchParams.get("temperature");
     const status = searchParams.get("status");
 
-    const filter: Record<string, unknown> = { userId: user._id };
+    const filter: Record<string, unknown> = user.companyId
+      ? { companyId: user.companyId }
+      : { userId: user._id };
     if (temperature) filter.temperature = temperature;
     if (status) filter.status = status;
 

@@ -13,6 +13,7 @@ export default async function DashboardLayout({
 }) {
   const user = await getCurrentUser();
   if (user.banned) redirect("/banned");
+  if (!user.companyId) redirect("/onboarding");
   const admin = isAdmin(user.email);
 
   return (

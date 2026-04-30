@@ -203,6 +203,7 @@ async function processInboundMessage(
   if (!conversation) {
     conversation = await WhatsAppConversation.create({
       userId: botConfig.userId,
+      companyId: botConfig.companyId,
       waPhone: normPhone,
       profileName,
       status: "active",
@@ -331,6 +332,7 @@ async function processInboundMessage(
     const ctx = athena.patientContext || {};
     const leadPayload = {
       userId: botConfig.userId,
+      companyId: botConfig.companyId,
       conversationId: conversation._id,
       waPhone: normPhone,
       name: athena.leadData?.name || existingLead?.name,

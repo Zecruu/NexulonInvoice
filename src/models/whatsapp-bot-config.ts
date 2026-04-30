@@ -3,6 +3,7 @@ import crypto from "crypto";
 
 export interface IWhatsAppBotConfig extends Document {
   userId: mongoose.Types.ObjectId;
+  companyId?: mongoose.Types.ObjectId;
   botId: string;
   enabled: boolean;
   botName: string;
@@ -31,6 +32,11 @@ const WhatsAppBotConfigSchema = new Schema<IWhatsAppBotConfig>(
       ref: "User",
       required: true,
       unique: true,
+      index: true,
+    },
+    companyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Company",
       index: true,
     },
     botId: {

@@ -36,6 +36,7 @@ export interface IPatientContext {
 
 export interface IWhatsAppConversation extends Document {
   userId: mongoose.Types.ObjectId;
+  companyId?: mongoose.Types.ObjectId;
   waPhone: string;
   customerName?: string;
   profileName?: string;
@@ -78,6 +79,11 @@ const WhatsAppConversationSchema = new Schema<IWhatsAppConversation>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
+    },
+    companyId: {
+      type: Schema.Types.ObjectId,
+      ref: "Company",
       index: true,
     },
     waPhone: { type: String, required: true, index: true },

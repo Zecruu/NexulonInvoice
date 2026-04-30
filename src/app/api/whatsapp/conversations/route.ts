@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
     const temperature = searchParams.get("temperature");
     const limit = Math.min(parseInt(searchParams.get("limit") || "100", 10), 500);
 
-    const filter: Record<string, unknown> = { userId: user._id };
+    // Multi-tenant scope: prefer companyId; fall back to userId for legacy
+    const filter: Record<string, unknown> = user.companyId
+      ? { companyId: user.companyId }
+      : { userId: user._id };
     if (status) filter.status = status;
     if (temperature) filter.temperature = temperature;
 
@@ -28,7 +31,7 @@ export async function GET(req: NextRequest) {
       .lean();
 
     const unreadCount = await WhatsAppConversation.countDocuments({
-      userId: user._id,
+      ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
       unread: true,
     });
 
