@@ -2,7 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import type { IWhatsAppConversation } from "@/models/whatsapp-conversation";
 import type { IWhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 
-const MODEL = "gemini-2.5-flash-lite";
+const PRIMARY_MODEL = "gemini-2.5-flash-lite";
+const FALLBACK_MODEL = "gemini-2.5-flash";
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
@@ -281,25 +282,38 @@ Keep it conversational and short. Match their language.`
 
   const prompt = `${system}\n\n${priorSignalsBlock}${resumeHint}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
 
-  let response;
-  try {
-    response = await getClient().models.generateContent({
-      model: MODEL,
+  async function tryModel(model: string) {
+    return getClient().models.generateContent({
+      model,
       config: { maxOutputTokens: 600, responseMimeType: "application/json" },
       contents: prompt,
     });
-  } catch (err) {
-    console.warn("[athena] first attempt failed, retrying once:", (err as Error).message);
-    await new Promise((r) => setTimeout(r, 600));
+  }
+
+  let response;
+  try {
+    response = await tryModel(PRIMARY_MODEL);
+  } catch (err1) {
+    const msg = (err1 as Error).message;
+    console.warn(`[athena] ${PRIMARY_MODEL} failed: ${msg.slice(0, 160)}`);
+
+    // Brief pause then retry primary once
+    await new Promise((r) => setTimeout(r, 500));
     try {
-      response = await getClient().models.generateContent({
-        model: MODEL,
-        config: { maxOutputTokens: 600, responseMimeType: "application/json" },
-        contents: prompt,
-      });
+      response = await tryModel(PRIMARY_MODEL);
     } catch (err2) {
-      console.error("[athena] retry also failed:", (err2 as Error).message);
-      return fallbackReply(latestText, config, conversation);
+      console.warn(
+        `[athena] ${PRIMARY_MODEL} retry failed, escalating to ${FALLBACK_MODEL}: ${(err2 as Error).message.slice(0, 160)}`
+      );
+      // Escalate to the bigger model (more capacity, ~3x cost but still cheap)
+      try {
+        response = await tryModel(FALLBACK_MODEL);
+      } catch (err3) {
+        console.error(
+          `[athena] ${FALLBACK_MODEL} also failed: ${(err3 as Error).message.slice(0, 160)}`
+        );
+        return fallbackReply(latestText, config, conversation);
+      }
     }
   }
 
