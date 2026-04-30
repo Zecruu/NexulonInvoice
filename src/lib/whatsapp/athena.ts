@@ -218,14 +218,28 @@ function fallbackKeywordCheck(
 
 function fallbackReply(
   latestText: string,
-  config: IWhatsAppBotConfig
+  config: IWhatsAppBotConfig,
+  conversation: IWhatsAppConversation
 ): AthenaResponse {
   const lang = detectLanguageFromText(latestText);
   const kw = fallbackKeywordCheck(latestText, config);
-  const reply =
-    lang === "es"
-      ? "Gracias por tu mensaje. Un miembro de nuestro equipo te contactará pronto."
-      : "Thanks for reaching out. A team member will follow up with you shortly.";
+  const botName = config.botName || "Athena";
+
+  // First-time greeter (no prior bot messages) — engage instead of dismiss
+  const hasPriorBotMsg = (conversation.messages || []).some((m) => m.role === "bot");
+  let reply: string;
+  if (!hasPriorBotMsg) {
+    reply =
+      lang === "es"
+        ? `¡Hola! Soy ${botName}, asistente virtual de la clínica. ¿Cuál es tu nombre y qué te trae por aquí hoy?`
+        : `Hi! I'm ${botName}, the clinic's virtual assistant. What's your name, and what brings you in today?`;
+  } else {
+    reply =
+      lang === "es"
+        ? "Disculpa, tuve un problema técnico. ¿Puedes repetirme lo último?"
+        : "Sorry, I had a brief technical issue. Could you repeat your last message?";
+  }
+
   return {
     reply,
     language: lang,
@@ -247,27 +261,40 @@ export async function runAthena(
   const latestText = latestCustomerMsg?.content || "";
 
   if (!process.env.GEMINI_API_KEY) {
-    return fallbackReply(latestText, config);
+    return fallbackReply(latestText, config, conversation);
+  }
+
+  const system = buildSystemPrompt(config, conversation);
+  const convo = buildConversationText(conversation);
+  const priorSignalsBlock =
+    priorSignals.length > 0
+      ? `Previous signals already emitted (do NOT re-emit):\n${priorSignals.map((s) => `- ${s.rule} (${s.delta >= 0 ? "+" : ""}${s.delta})`).join("\n")}`
+      : "Previous signals already emitted: (none yet)";
+  const prompt = `${system}\n\n${priorSignalsBlock}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
+
+  let response;
+  try {
+    response = await getClient().models.generateContent({
+      model: MODEL,
+      config: { maxOutputTokens: 600, responseMimeType: "application/json" },
+      contents: prompt,
+    });
+  } catch (err) {
+    console.warn("[athena] first attempt failed, retrying once:", (err as Error).message);
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      response = await getClient().models.generateContent({
+        model: MODEL,
+        config: { maxOutputTokens: 600, responseMimeType: "application/json" },
+        contents: prompt,
+      });
+    } catch (err2) {
+      console.error("[athena] retry also failed:", (err2 as Error).message);
+      return fallbackReply(latestText, config, conversation);
+    }
   }
 
   try {
-    const system = buildSystemPrompt(config, conversation);
-    const convo = buildConversationText(conversation);
-    const priorSignalsBlock =
-      priorSignals.length > 0
-        ? `Previous signals already emitted (do NOT re-emit):\n${priorSignals.map((s) => `- ${s.rule} (${s.delta >= 0 ? "+" : ""}${s.delta})`).join("\n")}`
-        : "Previous signals already emitted: (none yet)";
-
-    const prompt = `${system}\n\n${priorSignalsBlock}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
-
-    const response = await getClient().models.generateContent({
-      model: MODEL,
-      config: {
-        maxOutputTokens: 600,
-        responseMimeType: "application/json",
-      },
-      contents: prompt,
-    });
 
     const rawText = response.text || "";
     const cleaned = rawText
@@ -279,7 +306,7 @@ export async function runAthena(
     const parsed = JSON.parse(cleaned) as AthenaResponse;
 
     if (!parsed.reply || typeof parsed.reply !== "string") {
-      return fallbackReply(latestText, config);
+      return fallbackReply(latestText, config, conversation);
     }
 
     if (parsed.reply.length > 1000) {
@@ -296,7 +323,7 @@ export async function runAthena(
 
     return parsed;
   } catch (err) {
-    console.error("[athena] generation failed:", err);
-    return fallbackReply(latestText, config);
+    console.error("[athena] JSON parse / shape failed:", err);
+    return fallbackReply(latestText, config, conversation);
   }
 }
