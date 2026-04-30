@@ -2,8 +2,11 @@ import { GoogleGenAI } from "@google/genai";
 import type { IWhatsAppConversation } from "@/models/whatsapp-conversation";
 import type { IWhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 
-const PRIMARY_MODEL = "gemini-2.5-flash-lite";
-const FALLBACK_MODEL = "gemini-2.5-flash";
+const MODEL_CHAIN = [
+  "gemini-3.1-flash-lite-preview", // newest, cheapest
+  "gemini-2.5-flash-lite",         // proven backup
+  "gemini-2.5-flash",              // bigger, more capacity, ~3x cost
+] as const;
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
@@ -291,30 +294,30 @@ Keep it conversational and short. Match their language.`
   }
 
   let response;
-  try {
-    response = await tryModel(PRIMARY_MODEL);
-  } catch (err1) {
-    const msg = (err1 as Error).message;
-    console.warn(`[athena] ${PRIMARY_MODEL} failed: ${msg.slice(0, 160)}`);
-
-    // Brief pause then retry primary once
-    await new Promise((r) => setTimeout(r, 500));
+  let lastErr: Error | undefined;
+  for (let i = 0; i < MODEL_CHAIN.length; i++) {
+    const model = MODEL_CHAIN[i];
     try {
-      response = await tryModel(PRIMARY_MODEL);
-    } catch (err2) {
+      response = await tryModel(model);
+      if (i > 0) console.log(`[athena] succeeded on fallback model ${model} (tier ${i})`);
+      break;
+    } catch (err) {
+      lastErr = err as Error;
       console.warn(
-        `[athena] ${PRIMARY_MODEL} retry failed, escalating to ${FALLBACK_MODEL}: ${(err2 as Error).message.slice(0, 160)}`
+        `[athena] ${model} failed (tier ${i}): ${lastErr.message.slice(0, 160)}`
       );
-      // Escalate to the bigger model (more capacity, ~3x cost but still cheap)
-      try {
-        response = await tryModel(FALLBACK_MODEL);
-      } catch (err3) {
-        console.error(
-          `[athena] ${FALLBACK_MODEL} also failed: ${(err3 as Error).message.slice(0, 160)}`
-        );
-        return fallbackReply(latestText, config, conversation);
+      // Brief backoff before next model
+      if (i < MODEL_CHAIN.length - 1) {
+        await new Promise((r) => setTimeout(r, 400));
       }
     }
+  }
+
+  if (!response) {
+    console.error(
+      `[athena] all ${MODEL_CHAIN.length} models in chain failed. Last error: ${lastErr?.message.slice(0, 200)}`
+    );
+    return fallbackReply(latestText, config, conversation);
   }
 
   try {
