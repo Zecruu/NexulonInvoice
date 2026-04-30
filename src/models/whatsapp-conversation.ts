@@ -27,6 +27,8 @@ export interface IPatientContext {
   hasMRI?: boolean;
   diagnosis?: string;
   priorTreatments?: string[];
+  servicesInterested?: string[];
+  materialsShared?: boolean;
   urgency?: string;
   hasInsurance?: boolean;
   location?: string;
@@ -125,6 +127,8 @@ const WhatsAppConversationSchema = new Schema<IWhatsAppConversation>(
           hasMRI: Boolean,
           diagnosis: String,
           priorTreatments: { type: [String], default: undefined },
+          servicesInterested: { type: [String], default: undefined },
+          materialsShared: { type: Boolean, default: false },
           urgency: String,
           hasInsurance: Boolean,
           location: String,

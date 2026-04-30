@@ -249,6 +249,16 @@ async function processInboundMessage(
         mediaType = stored.mimeType;
         console.log(`[whatsapp-webhook] stored media at ${stored.url} (${stored.size} bytes)`);
       }
+
+      // Mark patientContext.materialsShared = true regardless of Athena emit
+      const ctx = (conversation.patientContext || {}) as Record<string, unknown>;
+      if (ctx.materialsShared !== true) {
+        (conversation as unknown as { patientContext: unknown }).patientContext = {
+          ...ctx,
+          materialsShared: true,
+          lastUpdated: new Date(),
+        };
+      }
     }
   }
 
@@ -347,6 +357,13 @@ async function processInboundMessage(
         ctx.priorTreatments && ctx.priorTreatments.length > 0
           ? ctx.priorTreatments
           : existingLead?.priorTreatments,
+      servicesInterested:
+        ctx.servicesInterested && ctx.servicesInterested.length > 0
+          ? ctx.servicesInterested
+          : existingLead?.servicesInterested,
+      materialsShared:
+        ctx.materialsShared === true ||
+        existingLead?.materialsShared === true,
       urgency: ctx.urgency || athena.leadData?.urgency || existingLead?.urgency,
       hasInsurance:
         ctx.hasInsurance !== undefined
@@ -381,6 +398,9 @@ async function processInboundMessage(
     if (ctx.diagnosis) merged.diagnosis = ctx.diagnosis;
     if (ctx.priorTreatments && ctx.priorTreatments.length > 0)
       merged.priorTreatments = ctx.priorTreatments;
+    if (ctx.servicesInterested && ctx.servicesInterested.length > 0)
+      merged.servicesInterested = ctx.servicesInterested;
+    if (ctx.materialsShared === true) merged.materialsShared = true;
     if (ctx.urgency) merged.urgency = ctx.urgency;
     if (ctx.hasInsurance !== undefined) merged.hasInsurance = ctx.hasInsurance;
     if (ctx.location) merged.location = ctx.location;

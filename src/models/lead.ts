@@ -30,6 +30,8 @@ export interface ILead extends Document {
   diagnosis?: string;
   hasMRI?: boolean;
   priorTreatments?: string[];
+  servicesInterested?: string[];
+  materialsShared?: boolean;
   urgency?: string;
   hasInsurance?: boolean;
   location?: string;
@@ -81,6 +83,8 @@ const LeadSchema = new Schema<ILead>(
     diagnosis: String,
     hasMRI: Boolean,
     priorTreatments: { type: [String], default: undefined },
+    servicesInterested: { type: [String], default: undefined },
+    materialsShared: { type: Boolean, default: false },
     urgency: String,
     hasInsurance: Boolean,
     location: String,

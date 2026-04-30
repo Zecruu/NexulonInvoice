@@ -9,6 +9,8 @@ interface PatientContext {
   hasMRI?: boolean;
   diagnosis?: string;
   priorTreatments?: string[];
+  servicesInterested?: string[];
+  materialsShared?: boolean;
   urgency?: string;
   hasInsurance?: boolean;
   location?: string;
@@ -54,6 +56,8 @@ export function PatientContextCard({ context }: { context?: PatientContext | nul
     ctx.hasMRI !== undefined ||
     ctx.diagnosis ||
     (ctx.priorTreatments && ctx.priorTreatments.length > 0) ||
+    (ctx.servicesInterested && ctx.servicesInterested.length > 0) ||
+    ctx.materialsShared ||
     ctx.urgency ||
     ctx.hasInsurance !== undefined ||
     ctx.location ||
@@ -145,6 +149,26 @@ export function PatientContextCard({ context }: { context?: PatientContext | nul
                 <span>{ctx.location || <span className="text-muted-foreground">—</span>}</span>
               </Field>
             </div>
+
+            {ctx.servicesInterested && ctx.servicesInterested.length > 0 && (
+              <Field label="Services Interested In">
+                <div className="flex flex-wrap gap-1">
+                  {ctx.servicesInterested.map((s, i) => (
+                    <Badge key={i} variant="default" className="text-[10px] capitalize">
+                      {s}
+                    </Badge>
+                  ))}
+                </div>
+              </Field>
+            )}
+
+            {ctx.materialsShared && (
+              <Field label="Materials Shared">
+                <Badge variant="outline" className="text-[10px]">
+                  Patient sent images / voice / docs — review in chat
+                </Badge>
+              </Field>
+            )}
 
             {ctx.priorTreatments && ctx.priorTreatments.length > 0 && (
               <Field label="Prior Treatments">
