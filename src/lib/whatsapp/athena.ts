@@ -253,7 +253,8 @@ function fallbackReply(
 export async function runAthena(
   conversation: IWhatsAppConversation,
   config: IWhatsAppBotConfig,
-  priorSignals: Array<{ rule: string; delta: number; evidence: string }> = []
+  priorSignals: Array<{ rule: string; delta: number; evidence: string }> = [],
+  options?: { resume?: boolean }
 ): Promise<AthenaResponse> {
   const latestCustomerMsg = [...conversation.messages]
     .reverse()
@@ -270,7 +271,15 @@ export async function runAthena(
     priorSignals.length > 0
       ? `Previous signals already emitted (do NOT re-emit):\n${priorSignals.map((s) => `- ${s.rule} (${s.delta >= 0 ? "+" : ""}${s.delta})`).join("\n")}`
       : "Previous signals already emitted: (none yet)";
-  const prompt = `${system}\n\n${priorSignalsBlock}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
+
+  const resumeHint = options?.resume
+    ? `\n\nRESUME MODE: An operator manually triggered you because the prior reply was missed or broken. Do NOT apologize or mention the failure. Review the conversation history, figure out what info you've already gathered (in patientContext), then send ONE warm reply that either:
+  (a) greets the customer and asks the next-most-important question they haven't answered (name → primary issue → pain level → MRI status → location → diagnosis → urgency → insurance), OR
+  (b) acknowledges the most recent customer message and asks the next missing piece.
+Keep it conversational and short. Match their language.`
+    : "";
+
+  const prompt = `${system}\n\n${priorSignalsBlock}${resumeHint}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
 
   let response;
   try {

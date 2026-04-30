@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Bot, UserRound, HeadsetIcon, Hand, Play, FileText, Download } from "lucide-react";
+import { Bot, UserRound, HeadsetIcon, Hand, Play, FileText, Download, Sparkles } from "lucide-react";
 
 interface Message {
   role: "customer" | "bot" | "human";
@@ -79,6 +79,7 @@ export function ConversationView({ conversation: initial, waPhone }: Props) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [handoffLoading, setHandoffLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -156,6 +157,27 @@ export function ConversationView({ conversation: initial, waPhone }: Props) {
     }
   }
 
+  async function resumeAthena() {
+    setResumeLoading(true);
+    try {
+      const res = await fetch(
+        `/api/whatsapp/conversations/${encodeURIComponent(waPhone)}/athena-resume`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const msg = await res.text();
+        toast.error(msg || "Athena resume failed");
+        return;
+      }
+      const data = await res.json();
+      setConversation(data.conversation);
+      toast.success("Athena re-engaged.");
+      router.refresh();
+    } finally {
+      setResumeLoading(false);
+    }
+  }
+
   const inHandoff = conversation.status === "human_handoff";
 
   return (
@@ -175,24 +197,38 @@ export function ConversationView({ conversation: initial, waPhone }: Props) {
             </span>
           )}
         </div>
-        <Button
-          size="sm"
-          variant={inHandoff ? "outline" : "default"}
-          onClick={() => toggleHandoff(inHandoff ? "release" : "take")}
-          disabled={handoffLoading}
-        >
-          {inHandoff ? (
-            <>
-              <Play className="mr-1.5 h-3.5 w-3.5" />
-              Release to bot
-            </>
-          ) : (
-            <>
-              <Hand className="mr-1.5 h-3.5 w-3.5" />
-              Take over
-            </>
+        <div className="flex items-center gap-2">
+          {!inHandoff && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={resumeAthena}
+              disabled={resumeLoading || conversation.messages.length === 0}
+              title="Re-trigger Athena to analyze the conversation and ask the next missing question"
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              {resumeLoading ? "Resuming…" : "Resume Athena"}
+            </Button>
           )}
-        </Button>
+          <Button
+            size="sm"
+            variant={inHandoff ? "outline" : "default"}
+            onClick={() => toggleHandoff(inHandoff ? "release" : "take")}
+            disabled={handoffLoading}
+          >
+            {inHandoff ? (
+              <>
+                <Play className="mr-1.5 h-3.5 w-3.5" />
+                Release to bot
+              </>
+            ) : (
+              <>
+                <Hand className="mr-1.5 h-3.5 w-3.5" />
+                Take over
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
