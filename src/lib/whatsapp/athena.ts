@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import type { IWhatsAppConversation } from "@/models/whatsapp-conversation";
 import type { IWhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 
@@ -7,6 +8,8 @@ const MODEL_CHAIN = [
   "gemini-2.5-flash-lite",         // proven backup
   "gemini-2.5-flash",              // bigger, more capacity, ~3x cost
 ] as const;
+
+const ANTHROPIC_FALLBACK_MODEL = "claude-haiku-4-5";
 
 let _client: GoogleGenAI | null = null;
 function getClient(): GoogleGenAI {
@@ -17,6 +20,15 @@ function getClient(): GoogleGenAI {
     _client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }
   return _client;
+}
+
+let _anthropic: Anthropic | null = null;
+function getAnthropicClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!_anthropic) {
+    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropic;
 }
 
 export interface AthenaSignal {
@@ -291,46 +303,87 @@ export async function runAthena(
 Keep it conversational and short. Match their language.`
     : "";
 
-  const prompt = `${system}\n\n${priorSignalsBlock}${resumeHint}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
+  const userMessage = `${priorSignalsBlock}${resumeHint}\n\nConversation so far:\n${convo}\n\nRespond as Athena (JSON only):`;
+  const fullPrompt = `${system}\n\n${userMessage}`;
 
-  async function tryModel(model: string) {
+  async function tryGemini(model: string) {
     return getClient().models.generateContent({
       model,
       config: { maxOutputTokens: 600, responseMimeType: "application/json" },
-      contents: prompt,
+      contents: fullPrompt,
     });
   }
 
-  let response;
+  let rawText: string | null = null;
   let lastErr: Error | undefined;
+
+  // Tiers 0-2: Gemini chain
   for (let i = 0; i < MODEL_CHAIN.length; i++) {
     const model = MODEL_CHAIN[i];
     try {
-      response = await tryModel(model);
-      if (i > 0) console.log(`[athena] succeeded on fallback model ${model} (tier ${i})`);
+      const response = await tryGemini(model);
+      rawText = response.text || "";
+      if (i > 0) console.log(`[athena] succeeded on Gemini fallback ${model} (tier ${i})`);
       break;
     } catch (err) {
       lastErr = err as Error;
       console.warn(
-        `[athena] ${model} failed (tier ${i}): ${lastErr.message.slice(0, 160)}`
+        `[athena] Gemini ${model} failed (tier ${i}): ${lastErr.message.slice(0, 160)}`
       );
-      // Brief backoff before next model
       if (i < MODEL_CHAIN.length - 1) {
         await new Promise((r) => setTimeout(r, 400));
       }
     }
   }
 
-  if (!response) {
+  // Tier 3: Claude Haiku 4.5 with prompt caching on the system block
+  if (rawText === null) {
+    const anthropic = getAnthropicClient();
+    if (anthropic) {
+      try {
+        console.warn(
+          `[athena] all ${MODEL_CHAIN.length} Gemini models failed, escalating to ${ANTHROPIC_FALLBACK_MODEL}`
+        );
+        const claudeResponse = await anthropic.messages.create({
+          model: ANTHROPIC_FALLBACK_MODEL,
+          max_tokens: 1024,
+          system: [
+            {
+              type: "text",
+              text: system,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: userMessage }],
+        });
+        const parts: string[] = [];
+        for (const block of claudeResponse.content) {
+          if (block.type === "text") parts.push(block.text);
+        }
+        rawText = parts.join("");
+        console.log(
+          `[athena] succeeded on Claude Haiku (cache_read=${claudeResponse.usage.cache_read_input_tokens ?? 0} cache_write=${claudeResponse.usage.cache_creation_input_tokens ?? 0} input=${claudeResponse.usage.input_tokens} output=${claudeResponse.usage.output_tokens})`
+        );
+      } catch (err) {
+        console.error(
+          `[athena] Claude Haiku also failed: ${(err as Error).message.slice(0, 200)}`
+        );
+      }
+    } else {
+      console.warn(
+        "[athena] ANTHROPIC_API_KEY not set; skipping Haiku fallback"
+      );
+    }
+  }
+
+  if (rawText === null) {
     console.error(
-      `[athena] all ${MODEL_CHAIN.length} models in chain failed. Last error: ${lastErr?.message.slice(0, 200)}`
+      `[athena] all models failed (Gemini chain + Anthropic). Last Gemini error: ${lastErr?.message.slice(0, 200)}`
     );
     return fallbackReply(latestText, config, conversation);
   }
 
   try {
-
-    const rawText = response.text || "";
     const cleaned = rawText
       .replace(/^```json\s*/i, "")
       .replace(/^```\s*/i, "")
