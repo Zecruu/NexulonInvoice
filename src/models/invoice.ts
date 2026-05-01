@@ -69,7 +69,7 @@ const InvoiceSchema = new Schema<IInvoice>(
       required: true,
       index: true,
     },
-    invoiceNumber: { type: String, required: true, unique: true },
+    invoiceNumber: { type: String, required: true },
     status: {
       type: String,
       enum: ["draft", "sent", "viewed", "paid", "overdue", "cancelled"],
@@ -111,6 +111,7 @@ const InvoiceSchema = new Schema<IInvoice>(
 InvoiceSchema.index({ userId: 1, status: 1 });
 InvoiceSchema.index({ userId: 1, dueDate: 1 });
 InvoiceSchema.index({ userId: 1, createdAt: -1 });
+InvoiceSchema.index({ userId: 1, invoiceNumber: 1 }, { unique: true });
 
 export const Invoice =
   mongoose.models.Invoice ||
