@@ -2,18 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import dbConnect from "@/lib/db";
-import { getCurrentUser } from "@/lib/get-user";
 import { Invoice } from "@/models/invoice";
 import { getStripe } from "@/lib/stripe";
 
+/**
+ * Create a Stripe Checkout session for an invoice.
+ *
+ * No auth gate — invoice _id is the access token (matches the share-by-link
+ * pattern used everywhere: invoice.nexulonllc.com/invoice/<id>). Used by both
+ * the dashboard's "Generate Payment Link" action AND the public Pay button
+ * on the recipient-facing invoice page.
+ */
 export async function createCheckoutSession(invoiceId: string) {
-  const user = await getCurrentUser();
   await dbConnect();
 
-  const invoice = await Invoice.findOne({
-    _id: invoiceId,
-    userId: user._id,
-  }).populate("clientId");
+  const invoice = await Invoice.findById(invoiceId).populate("clientId");
 
   if (!invoice) return { error: "Invoice not found" };
   if (invoice.status === "paid") return { error: "Invoice is already paid" };
