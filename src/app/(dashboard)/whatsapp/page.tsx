@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/get-user";
 import dbConnect from "@/lib/db";
 import { WhatsAppConversation } from "@/models/whatsapp-conversation";
-import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
+import { getOrCreateBotConfig } from "@/lib/whatsapp/bot-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Sparkles } from "lucide-react";
@@ -33,12 +33,12 @@ export default async function WhatsAppPage() {
   const user = await getCurrentUser();
   await dbConnect();
 
-  let botConfig = await WhatsAppBotConfig.findOne({ userId: user._id });
-  if (!botConfig) {
-    botConfig = await WhatsAppBotConfig.create({ userId: user._id });
-  }
+  const botConfig = await getOrCreateBotConfig(user);
 
-  const conversations = await WhatsAppConversation.find({ userId: user._id })
+  const scope = user.companyId
+    ? { companyId: user.companyId }
+    : { userId: user._id };
+  const conversations = await WhatsAppConversation.find(scope)
     .sort({ lastMessageAt: -1 })
     .limit(200)
     .select(

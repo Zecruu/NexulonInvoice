@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/get-user";
 import { isAdmin } from "@/lib/admin";
 import dbConnect from "@/lib/db";
-import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
+import { getOrCreateBotConfig } from "@/lib/whatsapp/bot-config";
 import { BotConfigForm } from "@/components/whatsapp/bot-config-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -15,10 +15,7 @@ export default async function BotConfigPage() {
   if (!isAdmin(user.email)) redirect(`/whatsapp`);
   await dbConnect();
 
-  let config = await WhatsAppBotConfig.findOne({ userId: user._id });
-  if (!config) {
-    config = await WhatsAppBotConfig.create({ userId: user._id });
-  }
+  const config = await getOrCreateBotConfig(user);
   const initial = JSON.parse(JSON.stringify(config.toObject()));
 
   return (

@@ -14,7 +14,9 @@ export default async function LeadsPage() {
   const user = await getCurrentUser();
   await dbConnect();
 
-  const leads = await Lead.find({ userId: user._id })
+  const leads = await Lead.find(
+    user.companyId ? { companyId: user.companyId } : { userId: user._id }
+  )
     .sort({ temperature: 1, createdAt: -1 })
     .limit(500)
     .lean();

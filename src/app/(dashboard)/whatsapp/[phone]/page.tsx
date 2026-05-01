@@ -25,7 +25,7 @@ export default async function ConversationPage({
   await dbConnect();
 
   const conversationDoc = await WhatsAppConversation.findOne({
-    userId: user._id,
+    ...(user.companyId ? { companyId: user.companyId } : { userId: user._id }),
     waPhone,
   });
 

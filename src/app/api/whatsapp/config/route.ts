@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/get-user";
 import dbConnect from "@/lib/db";
-import { WhatsAppBotConfig } from "@/models/whatsapp-bot-config";
+import { getOrCreateBotConfig } from "@/lib/whatsapp/bot-config";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +10,7 @@ export async function GET() {
     const user = await getCurrentUser();
     await dbConnect();
 
-    let config = await WhatsAppBotConfig.findOne({ userId: user._id });
-    if (!config) {
-      config = await WhatsAppBotConfig.create({ userId: user._id });
-    }
+    const config = await getOrCreateBotConfig(user);
     return NextResponse.json({ config });
   } catch (err) {
     console.error("[GET /api/whatsapp/config]", err);
@@ -28,10 +25,7 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json();
 
-    let config = await WhatsAppBotConfig.findOne({ userId: user._id });
-    if (!config) {
-      config = await WhatsAppBotConfig.create({ userId: user._id });
-    }
+    const config = await getOrCreateBotConfig(user);
 
     const fields = [
       "enabled",
