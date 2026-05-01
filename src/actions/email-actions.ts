@@ -46,6 +46,7 @@ export async function sendInvoiceEmail(invoiceId: string) {
       total: formatCurrency(invoice.total, invoice.currency),
       dueDate: formatDate(invoice.dueDate),
       paymentUrl,
+      logoUrl: user.businessLogo,
     }),
   });
 

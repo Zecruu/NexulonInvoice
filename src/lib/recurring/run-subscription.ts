@@ -73,7 +73,7 @@ export async function runSubscriptionOnce(
   if (sub.autoSend) {
     const [user, client] = await Promise.all([
       User.findById(sub.userId)
-        .select("businessName firstName lastName")
+        .select("businessName businessLogo firstName lastName")
         .lean(),
       Client.findById(sub.clientId).select("name email").lean(),
     ]);
@@ -96,6 +96,7 @@ export async function runSubscriptionOnce(
           total: formatCurrency(invoice.total, invoice.currency),
           dueDate: formatDate(invoice.dueDate),
           paymentUrl,
+          logoUrl: user.businessLogo,
         }),
       });
 

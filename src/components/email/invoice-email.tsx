@@ -8,6 +8,7 @@ import {
   Button,
   Hr,
   Preview,
+  Img,
 } from "@react-email/components";
 
 interface InvoiceEmailProps {
@@ -17,6 +18,7 @@ interface InvoiceEmailProps {
   total: string;
   dueDate: string;
   paymentUrl: string;
+  logoUrl?: string;
 }
 
 export function InvoiceEmail({
@@ -26,6 +28,7 @@ export function InvoiceEmail({
   total,
   dueDate,
   paymentUrl,
+  logoUrl,
 }: InvoiceEmailProps) {
   return (
     <Html>
@@ -35,6 +38,15 @@ export function InvoiceEmail({
       </Preview>
       <Body style={main}>
         <Container style={container}>
+          {logoUrl ? (
+            <Section style={logoContainer}>
+              <Img
+                src={logoUrl}
+                alt={businessName}
+                style={logo}
+              />
+            </Section>
+          ) : null}
           <Text style={heading}>{businessName}</Text>
 
           <Text style={paragraph}>Hi {clientName},</Text>
@@ -93,6 +105,19 @@ const heading = {
   fontWeight: "700" as const,
   color: "#1a1a1a",
   padding: "0 48px",
+};
+
+const logoContainer = {
+  padding: "0 48px",
+  marginBottom: "8px",
+};
+
+const logo = {
+  maxHeight: "56px",
+  maxWidth: "200px",
+  height: "auto",
+  width: "auto",
+  objectFit: "contain" as const,
 };
 
 const paragraph = {
