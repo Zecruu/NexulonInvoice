@@ -34,7 +34,7 @@ export interface IUser extends Document {
 const UserSchema = new Schema<IUser>(
   {
     clerkId: { type: String, required: true, unique: true, index: true },
-    email: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
     firstName: { type: String, default: "" },
     lastName: { type: String, default: "" },
     imageUrl: String,
@@ -66,6 +66,8 @@ const UserSchema = new Schema<IUser>(
   },
   { timestamps: true }
 );
+
+UserSchema.index({ email: 1 }, { unique: true });
 
 export const User =
   mongoose.models.User || mongoose.model<IUser>("User", UserSchema);
