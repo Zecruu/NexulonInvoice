@@ -217,7 +217,7 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
             onClick={() => setShowDelete(true)}
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            {invoice.status === "draft" ? "Delete" : "Cancel"}
+            Delete invoice
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -225,13 +225,9 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
       <ConfirmDialog
         open={showDelete}
         onOpenChange={setShowDelete}
-        title="Delete Invoice"
-        description={
-          invoice.status === "draft"
-            ? "This will permanently delete this draft invoice."
-            : "This will mark this invoice as cancelled."
-        }
-        confirmLabel="Confirm"
+        title="Delete invoice permanently?"
+        description={`This will permanently remove invoice ${invoice.invoiceNumber} and any associated payment records. This cannot be undone.`}
+        confirmLabel="Delete permanently"
         variant="destructive"
         onConfirm={handleDelete}
         loading={loading}

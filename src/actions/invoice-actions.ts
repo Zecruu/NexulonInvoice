@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import { getCurrentUser } from "@/lib/get-user";
 import { Invoice } from "@/models/invoice";
 import { Client } from "@/models/client";
+import { Payment } from "@/models/payment";
 import { invoiceSchema, InvoiceFormData } from "@/lib/validations";
 import { TIER_LIMITS, TIER_LABELS } from "@/lib/constants";
 import type { InvoiceStatus, Tier } from "@/lib/constants";
@@ -261,12 +262,15 @@ export async function deleteInvoice(invoiceId: string) {
   const invoice = await Invoice.findOne({ _id: invoiceId, userId: user._id });
   if (!invoice) return { error: "Invoice not found" };
 
-  if (invoice.status === "draft") {
-    await Invoice.findByIdAndDelete(invoiceId);
-  } else {
-    invoice.status = "cancelled";
-    await invoice.save();
+  if (invoice.status === "paid") {
+    return {
+      error:
+        "Cannot delete a paid invoice. Refund the payment in Stripe first, then delete.",
+    };
   }
+
+  await Payment.deleteMany({ invoiceId: invoice._id });
+  await Invoice.findByIdAndDelete(invoiceId);
 
   revalidatePath("/invoices");
   revalidatePath("/dashboard");

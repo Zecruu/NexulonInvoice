@@ -165,7 +165,7 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                         onClick={() => setDeleteId(invoice._id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        {invoice.status === "draft" ? "Delete" : "Cancel"}
+                        Delete invoice
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -179,9 +179,9 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
       <ConfirmDialog
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
-        title="Delete Invoice"
-        description="Are you sure? Draft invoices will be deleted permanently. Active invoices will be marked as cancelled."
-        confirmLabel="Confirm"
+        title="Delete invoice permanently?"
+        description="This permanently removes the invoice and any associated payment records. Paid invoices can't be deleted — refund via Stripe first. This cannot be undone."
+        confirmLabel="Delete permanently"
         variant="destructive"
         onConfirm={handleDelete}
         loading={deleting}
