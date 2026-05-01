@@ -121,16 +121,17 @@ const paragraph = {
 };
 
 const detailsBox = {
-  backgroundColor: "#f4f4f5",
-  borderRadius: "4px",
+  backgroundColor: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: "6px",
   margin: "16px 48px",
   padding: "16px 24px",
 };
 
 const detailRow = {
   fontSize: "14px",
-  lineHeight: "24px",
-  color: "#484848",
+  lineHeight: "22px",
+  color: "#1f2937",
   margin: "0",
 };
 
