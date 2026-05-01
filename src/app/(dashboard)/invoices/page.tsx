@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { InvoiceTable } from "@/components/invoices/invoice-table";
+import { InvoiceSearch } from "@/components/invoices/invoice-search";
 import { getInvoices } from "@/actions/invoice-actions";
 import type { InvoiceStatus } from "@/lib/constants";
 
@@ -49,34 +50,39 @@ export default async function InvoicesPage({
         </Link>
       </PageHeader>
 
-      <Tabs defaultValue={params.status || "all"}>
-        <TabsList>
-          {statusTabs.map((tab) => (
-            <Link
-              key={tab.value}
-              href={
-                tab.value === "all"
-                  ? "/invoices"
-                  : `/invoices?status=${tab.value}`
-              }
-            >
-              <TabsTrigger value={tab.value}>{tab.label}</TabsTrigger>
-            </Link>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs defaultValue={params.status || "all"}>
+          <TabsList>
+            {statusTabs.map((tab) => (
+              <Link
+                key={tab.value}
+                href={
+                  tab.value === "all"
+                    ? "/invoices"
+                    : `/invoices?status=${tab.value}`
+                }
+              >
+                <TabsTrigger value={tab.value}>{tab.label}</TabsTrigger>
+              </Link>
+            ))}
+          </TabsList>
+        </Tabs>
+        <InvoiceSearch />
+      </div>
 
       {invoices.length === 0 ? (
         <EmptyState
           icon={FileText}
           title="No invoices found"
           description={
-            status
-              ? `No ${status} invoices. Try a different filter.`
-              : "Create your first invoice to get started."
+            params.search
+              ? `No invoices match "${params.search}". Try a different query.`
+              : status
+                ? `No ${status} invoices. Try a different filter.`
+                : "Create your first invoice to get started."
           }
         >
-          {!status && (
+          {!status && !params.search && (
             <Link href="/invoices/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
