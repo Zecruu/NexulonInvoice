@@ -4,7 +4,15 @@ import { User, IUser } from "@/models/user";
 
 /**
  * Get the current MongoDB user document, creating it if it doesn't exist.
- * Uses findOneAndUpdate with upsert to avoid race conditions and duplicate key errors.
+ *
+ * Lookup priority:
+ *   1. clerkId match (the canonical happy path).
+ *   2. email match — if a User already exists for this email but with an
+ *      older clerkId, we claim it (rebind clerkId to the current session).
+ *      This prevents duplicate User docs when a Clerk user is deleted and
+ *      re-created (e.g. invite flow), or when stale tokens hit after a
+ *      manual merge.
+ *   3. Otherwise, create a new User.
  */
 export async function getCurrentUser(): Promise<IUser> {
   const { userId: clerkId } = await auth();
@@ -12,26 +20,28 @@ export async function getCurrentUser(): Promise<IUser> {
 
   await dbConnect();
 
-  let user = await User.findOne({ clerkId });
+  const byClerkId = await User.findOne({ clerkId });
+  if (byClerkId) return byClerkId;
 
-  if (!user) {
-    const clerkUser = await currentUser();
-    if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+  const email = clerkUser.emailAddresses[0]?.emailAddress?.toLowerCase() || "";
 
-    user = await User.findOneAndUpdate(
-      { clerkId },
-      {
-        $setOnInsert: {
-          clerkId,
-          email: clerkUser.emailAddresses[0]?.emailAddress || "",
-          firstName: clerkUser.firstName || "",
-          lastName: clerkUser.lastName || "",
-          imageUrl: clerkUser.imageUrl,
-        },
-      },
-      { upsert: true, new: true }
-    );
+  if (email) {
+    const byEmail = await User.findOne({ email });
+    if (byEmail) {
+      byEmail.clerkId = clerkId;
+      if (clerkUser.imageUrl) byEmail.imageUrl = clerkUser.imageUrl;
+      await byEmail.save();
+      return byEmail;
+    }
   }
 
-  return user!;
+  return User.create({
+    clerkId,
+    email,
+    firstName: clerkUser.firstName || "",
+    lastName: clerkUser.lastName || "",
+    imageUrl: clerkUser.imageUrl,
+  });
 }
