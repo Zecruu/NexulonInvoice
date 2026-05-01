@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import { getCurrentUser } from "@/lib/get-user";
 import { Invoice } from "@/models/invoice";
 import { Subscription, SubscriptionFrequency } from "@/models/subscription";
+import { runSubscriptionOnce } from "@/lib/recurring/run-subscription";
 
 const userScope = (user: { _id: unknown; companyId?: unknown }) =>
   user.companyId ? { companyId: user.companyId } : { userId: user._id };
@@ -217,6 +218,38 @@ export async function updateSubscriptionStatus(
   revalidatePath("/subscriptions");
   revalidatePath(`/subscriptions/${id}`);
   return { success: true };
+}
+
+export async function runSubscriptionNow(id: string) {
+  const user = await getCurrentUser();
+  await dbConnect();
+
+  const sub = await Subscription.findOne({
+    _id: id,
+    ...userScope(user as { _id: unknown; companyId?: unknown }),
+  });
+  if (!sub) return { error: "Subscription not found" };
+  if (sub.status !== "active") {
+    return { error: `Subscription is ${sub.status}, resume it first` };
+  }
+
+  try {
+    const r = await runSubscriptionOnce(sub);
+    revalidatePath("/subscriptions");
+    revalidatePath(`/subscriptions/${id}`);
+    revalidatePath("/invoices");
+    return {
+      success: true,
+      invoiceId: r.invoiceId,
+      invoiceNumber: r.invoiceNumber,
+      emailed: r.emailed,
+      emailError: r.emailError,
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to generate invoice",
+    };
+  }
 }
 
 export async function deleteSubscription(id: string) {

@@ -7,9 +7,10 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   updateSubscriptionStatus,
   deleteSubscription,
+  runSubscriptionNow,
 } from "@/actions/subscription-actions";
 import { toast } from "sonner";
-import { Pause, Play, Trash2 } from "lucide-react";
+import { Pause, Play, Trash2, Send } from "lucide-react";
 
 export function SubscriptionActions({
   id,
@@ -20,7 +21,30 @@ export function SubscriptionActions({
 }) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [runConfirmOpen, setRunConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [running, setRunning] = useState(false);
+
+  async function runNow() {
+    setRunning(true);
+    const r = await runSubscriptionNow(id);
+    setRunning(false);
+    setRunConfirmOpen(false);
+    if (r.error) {
+      toast.error(r.error);
+      return;
+    }
+    if (r.emailed) {
+      toast.success(`Invoice ${r.invoiceNumber} created and emailed`);
+    } else if (r.emailError) {
+      toast.warning(
+        `Invoice ${r.invoiceNumber} created, but email failed: ${r.emailError}`
+      );
+    } else {
+      toast.success(`Invoice ${r.invoiceNumber} created (auto-send is off)`);
+    }
+    router.refresh();
+  }
 
   async function toggle() {
     setLoading(true);
@@ -52,6 +76,16 @@ export function SubscriptionActions({
   return (
     <>
       <div className="flex gap-2">
+        {status === "active" && (
+          <Button
+            size="sm"
+            onClick={() => setRunConfirmOpen(true)}
+            disabled={running}
+          >
+            <Send className="mr-1.5 h-3.5 w-3.5" />
+            {running ? "Sending…" : "Send invoice now"}
+          </Button>
+        )}
         {status !== "cancelled" && (
           <Button
             variant="outline"
@@ -82,6 +116,15 @@ export function SubscriptionActions({
           Delete
         </Button>
       </div>
+      <ConfirmDialog
+        open={runConfirmOpen}
+        onOpenChange={setRunConfirmOpen}
+        title="Generate and send invoice now?"
+        description="This creates a new invoice from the template right now and emails it to the client (if auto-send is on). The next-run date will advance by one cycle."
+        confirmLabel="Send now"
+        onConfirm={runNow}
+        loading={running}
+      />
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
