@@ -9,6 +9,7 @@ import {
   Pencil,
   Copy,
   Trash2,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteInvoice, duplicateInvoice } from "@/actions/invoice-actions";
+import { resendInvoiceEmail } from "@/actions/email-actions";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { InvoiceType, ClientType } from "@/types";
 
@@ -64,6 +66,16 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
     } else {
       toast.success("Invoice duplicated");
       router.push(`/invoices/${result.invoiceId}`);
+    }
+  }
+
+  async function handleResend(invoiceId: string) {
+    const result = await resendInvoiceEmail(invoiceId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Invoice resent with current branding");
+      router.refresh();
     }
   }
 
@@ -139,6 +151,14 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                         <Copy className="mr-2 h-4 w-4" />
                         Duplicate
                       </DropdownMenuItem>
+                      {invoice.status !== "draft" && (
+                        <DropdownMenuItem
+                          onClick={() => handleResend(invoice._id)}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          Resend with current branding
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"

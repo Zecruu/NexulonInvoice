@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { SubscriptionActions } from "@/components/subscriptions/subscription-actions";
+import { ResendInvoiceButton } from "@/components/subscriptions/resend-invoice-button";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +160,7 @@ export default async function SubscriptionDetail({
                   <th className="px-4 py-2 font-medium">Issued</th>
                   <th className="px-4 py-2 font-medium">Due</th>
                   <th className="px-4 py-2 text-right font-medium">Amount</th>
+                  <th className="px-4 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -194,6 +196,12 @@ export default async function SubscriptionDetail({
                       </td>
                       <td className="px-4 py-2 text-right font-mono">
                         {formatCurrency(inv.total, inv.currency)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <ResendInvoiceButton
+                          invoiceId={inv._id}
+                          disabled={inv.status === "draft"}
+                        />
                       </td>
                     </tr>
                   )

@@ -46,7 +46,7 @@ import {
   updateInvoiceStatus,
 } from "@/actions/invoice-actions";
 import { createCheckoutSession } from "@/actions/payment-actions";
-import { sendInvoiceEmail } from "@/actions/email-actions";
+import { sendInvoiceEmail, resendInvoiceEmail } from "@/actions/email-actions";
 import { makeInvoiceRecurring } from "@/actions/subscription-actions";
 import type { InvoiceType } from "@/types";
 
@@ -128,6 +128,16 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
     }
   }
 
+  async function handleResendEmail() {
+    const result = await resendInvoiceEmail(invoice._id);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success("Invoice resent with current branding");
+      router.refresh();
+    }
+  }
+
   function handleCopyPublicLink() {
     const url = `${window.location.origin}/invoice/${invoice._id}`;
     navigator.clipboard.writeText(url);
@@ -172,6 +182,12 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
                 Mark as Paid
               </DropdownMenuItem>
             </>
+          )}
+          {invoice.status !== "draft" && (
+            <DropdownMenuItem onClick={handleResendEmail}>
+              <Send className="mr-2 h-4 w-4" />
+              Resend with current branding
+            </DropdownMenuItem>
           )}
           <DropdownMenuItem asChild>
             <a

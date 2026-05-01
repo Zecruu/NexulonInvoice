@@ -64,3 +64,57 @@ export async function sendInvoiceEmail(invoiceId: string) {
   revalidatePath("/invoices");
   return { success: true };
 }
+
+/**
+ * Resend an invoice email with the user's CURRENT branding (businessName + logo).
+ * Unlike sendInvoiceEmail, this works on any status (paid, cancelled, sent, viewed)
+ * and does not change the invoice's status. Useful for re-emailing old invoices
+ * after updating your branding.
+ */
+export async function resendInvoiceEmail(invoiceId: string) {
+  const user = await getCurrentUser();
+  await dbConnect();
+
+  const invoice = await Invoice.findOne({
+    _id: invoiceId,
+    userId: user._id,
+  }).populate("clientId");
+
+  if (!invoice) return { error: "Invoice not found" };
+
+  const client = invoice.clientId as { name: string; email: string };
+  if (!client?.email) return { error: "Client has no email on file" };
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const paymentUrl = `${appUrl}/invoice/${invoiceId}`;
+  const businessName =
+    user.businessName || `${user.firstName} ${user.lastName}`;
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+
+  const { error } = await resend.emails.send({
+    from: `${businessName} <${fromEmail}>`,
+    to: client.email,
+    subject: `Invoice ${invoice.invoiceNumber} from ${businessName}`,
+    react: InvoiceEmail({
+      invoiceNumber: invoice.invoiceNumber,
+      clientName: client.name,
+      businessName,
+      total: formatCurrency(invoice.total, invoice.currency),
+      dueDate: formatDate(invoice.dueDate),
+      paymentUrl,
+      logoUrl: user.businessLogo,
+    }),
+  });
+
+  if (error) {
+    return { error: `Failed to send email: ${error.message}` };
+  }
+
+  invoice.sentAt = new Date();
+  invoice.sentTo = client.email;
+  await invoice.save();
+
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/invoices");
+  return { success: true };
+}
