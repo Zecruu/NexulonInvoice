@@ -11,9 +11,27 @@ import {
   Link2,
   Send,
   Download,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +47,7 @@ import {
 } from "@/actions/invoice-actions";
 import { createCheckoutSession } from "@/actions/payment-actions";
 import { sendInvoiceEmail } from "@/actions/email-actions";
+import { makeInvoiceRecurring } from "@/actions/subscription-actions";
 import type { InvoiceType } from "@/types";
 
 interface InvoiceActionsProps {
@@ -39,6 +58,34 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(false);
+  const [recurringSaving, setRecurringSaving] = useState(false);
+  const [frequency, setFrequency] = useState<"monthly" | "yearly">("monthly");
+  const [dueDays, setDueDays] = useState(7);
+  const [autoSend, setAutoSend] = useState(true);
+  const [label, setLabel] = useState("");
+
+  async function handleMakeRecurring() {
+    setRecurringSaving(true);
+    try {
+      const result = await makeInvoiceRecurring({
+        invoiceId: invoice._id,
+        frequency,
+        dueDays,
+        autoSend,
+        label: label || undefined,
+      });
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Subscription created");
+      setShowRecurring(false);
+      router.push(`/subscriptions/${result.subscriptionId}`);
+    } finally {
+      setRecurringSaving(false);
+    }
+  }
 
   async function handleDuplicate() {
     const result = await duplicateInvoice(invoice._id);
@@ -144,6 +191,10 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
             <Copy className="mr-2 h-4 w-4" />
             Duplicate
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowRecurring(true)}>
+            <Repeat className="mr-2 h-4 w-4" />
+            Make recurring
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive"
@@ -169,6 +220,78 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
         onConfirm={handleDelete}
         loading={loading}
       />
+
+      <Dialog open={showRecurring} onOpenChange={setShowRecurring}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Make this invoice recurring</DialogTitle>
+            <DialogDescription>
+              This invoice stays as the first cycle. Future invoices will be
+              auto-generated from this template on the schedule below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="rec-freq">Frequency</Label>
+              <Select
+                value={frequency}
+                onValueChange={(v) => setFrequency(v as "monthly" | "yearly")}
+              >
+                <SelectTrigger id="rec-freq">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="rec-due">Due in (days)</Label>
+              <Input
+                id="rec-due"
+                type="number"
+                min={0}
+                value={dueDays}
+                onChange={(e) => setDueDays(parseInt(e.target.value) || 0)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="rec-label">Label (optional)</Label>
+              <Input
+                id="rec-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g. Monthly retainer"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoSend}
+                onChange={(e) => setAutoSend(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+              Auto-send each cycle by email
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRecurring(false)}
+              disabled={recurringSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleMakeRecurring} disabled={recurringSaving}>
+              {recurringSaving ? "Creating…" : "Create subscription"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -11,6 +11,7 @@ import {
   Menu,
   Shield,
   MessageCircle,
+  Repeat,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +26,7 @@ import { useWhatsAppUnread } from "@/hooks/use-whatsapp-unread";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Invoices", href: "/invoices", icon: FileText },
+  { label: "Subscriptions", href: "/subscriptions", icon: Repeat },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, badge: "whatsapp" as const },
   { label: "Settings", href: "/settings", icon: Settings },
