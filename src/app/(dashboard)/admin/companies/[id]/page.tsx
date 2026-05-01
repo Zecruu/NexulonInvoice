@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Copy } from "lucide-react";
 import { CompanyDetailClient } from "@/components/admin/company-detail-client";
+import { CompanyFeaturesToggle } from "@/components/admin/company-features-toggle";
 import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,11 @@ export default async function CompanyDetailPage({
           </p>
         </div>
       </div>
+
+      <CompanyFeaturesToggle
+        companyId={String(company._id)}
+        initialInvoicesEnabled={Boolean(company.featuresEnabled?.invoices)}
+      />
 
       <div className="rounded-lg border bg-muted/30 p-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">

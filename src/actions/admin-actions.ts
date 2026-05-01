@@ -6,6 +6,7 @@ import dbConnect from "@/lib/db";
 import { requireAdmin, isAdmin } from "@/lib/admin";
 import { User } from "@/models/user";
 import { Invoice } from "@/models/invoice";
+import { Company } from "@/models/company";
 import type { Tier } from "@/lib/constants";
 
 function getMonthStart() {
@@ -143,6 +144,25 @@ export async function unbanUser(userId: string) {
   if (!target) return { error: "User not found" };
 
   revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function setCompanyInvoicing(
+  companyId: string,
+  enabled: boolean
+) {
+  await requireAdmin();
+  await dbConnect();
+
+  const company = await Company.findByIdAndUpdate(
+    companyId,
+    { $set: { "featuresEnabled.invoices": enabled } },
+    { new: true }
+  );
+  if (!company) return { error: "Company not found" };
+
+  revalidatePath("/admin/companies");
+  revalidatePath(`/admin/companies/${companyId}`);
   return { success: true };
 }
 

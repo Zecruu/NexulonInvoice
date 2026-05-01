@@ -67,6 +67,7 @@ export default async function AdminCompaniesPage() {
                 <th className="px-4 py-2 font-medium">Bots</th>
                 <th className="px-4 py-2 font-medium">Convos</th>
                 <th className="px-4 py-2 font-medium">Leads</th>
+                <th className="px-4 py-2 font-medium">Invoicing</th>
                 <th className="px-4 py-2" />
               </tr>
             </thead>
@@ -79,6 +80,17 @@ export default async function AdminCompaniesPage() {
                   <td className="px-4 py-3">{c.botCount}</td>
                   <td className="px-4 py-3">{c.conversationCount}</td>
                   <td className="px-4 py-3">{c.leadCount}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        c.featuresEnabled?.invoices
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {c.featuresEnabled?.invoices ? "On" : "Off"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <Link href={`/admin/companies/${String(c._id)}`}>
                       <Button variant="outline" size="sm">

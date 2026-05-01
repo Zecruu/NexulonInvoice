@@ -23,27 +23,34 @@ import {
 import { cn } from "@/lib/utils";
 import { useWhatsAppUnread } from "@/hooks/use-whatsapp-unread";
 
-const navItems = [
+const baseNav = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Invoices", href: "/invoices", icon: FileText },
-  { label: "Subscriptions", href: "/subscriptions", icon: Repeat },
-  { label: "Clients", href: "/clients", icon: Users },
   { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, badge: "whatsapp" as const },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
+const invoicingNav = [
+  { label: "Invoices", href: "/invoices", icon: FileText },
+  { label: "Subscriptions", href: "/subscriptions", icon: Repeat },
+  { label: "Clients", href: "/clients", icon: Users },
+];
+
 interface MobileNavProps {
   isAdmin?: boolean;
+  invoicingEnabled?: boolean;
 }
 
-export function MobileNav({ isAdmin }: MobileNavProps) {
+export function MobileNav({ isAdmin, invoicingEnabled }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const unread = useWhatsAppUnread();
 
-  const items = isAdmin
-    ? [...navItems, { label: "Users", href: "/admin", icon: Shield }]
-    : navItems;
+  const items = [
+    baseNav[0],
+    ...(invoicingEnabled ? invoicingNav : []),
+    ...baseNav.slice(1),
+    ...(isAdmin ? [{ label: "Users", href: "/admin", icon: Shield }] : []),
+  ];
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

@@ -6,13 +6,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 interface HeaderProps {
   isAdmin?: boolean;
+  invoicingEnabled?: boolean;
 }
 
-export function Header({ isAdmin }: HeaderProps) {
+export function Header({ isAdmin, invoicingEnabled }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b px-4 lg:px-6">
       <div className="flex items-center gap-4">
-        <MobileNav isAdmin={isAdmin} />
+        <MobileNav isAdmin={isAdmin} invoicingEnabled={invoicingEnabled} />
         <h2 className="text-lg font-semibold lg:hidden">Nexulon Invoice</h2>
       </div>
       <div className="flex items-center gap-2">

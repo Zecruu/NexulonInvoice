@@ -8,6 +8,9 @@ export interface ICompany extends Document {
   ownerUserId?: mongoose.Types.ObjectId;
   brandLogo?: string;
   brandPrimaryColor?: string;
+  featuresEnabled?: {
+    invoices?: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +34,9 @@ const CompanySchema = new Schema<ICompany>(
     ownerUserId: { type: Schema.Types.ObjectId, ref: "User" },
     brandLogo: String,
     brandPrimaryColor: String,
+    featuresEnabled: {
+      invoices: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );
