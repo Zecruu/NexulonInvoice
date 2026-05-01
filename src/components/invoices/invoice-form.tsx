@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +22,11 @@ import {
 import { ClientSelect } from "@/components/clients/client-select";
 import { LineItemEditor } from "./line-item-editor";
 import { invoiceSchema, InvoiceFormData } from "@/lib/validations";
-import { createInvoice, updateInvoice } from "@/actions/invoice-actions";
+import {
+  createInvoice,
+  createAndSendInvoice,
+  updateInvoice,
+} from "@/actions/invoice-actions";
 import { formatDateISO } from "@/lib/format";
 import type { ClientType, InvoiceType } from "@/types";
 
@@ -39,6 +45,7 @@ interface InvoiceFormProps {
 export function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
   const router = useRouter();
   const isEditing = !!invoice;
+  const [submitMode, setSubmitMode] = useState<"draft" | "send">("draft");
 
   const today = formatDateISO(new Date());
   const defaultDue = formatDateISO(
@@ -107,20 +114,44 @@ export function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
   const total = subtotal + taxAmount - discountAmount;
 
   async function onSubmit(data: InvoiceFormData) {
-    const result = isEditing
-      ? await updateInvoice(invoice!._id, data)
-      : await createInvoice(data);
+    if (isEditing) {
+      const result = await updateInvoice(invoice!._id, data);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Invoice updated");
+      router.push("/invoices");
+      return;
+    }
 
+    if (submitMode === "send") {
+      const result = await createAndSendInvoice(data);
+      if ("error" in result && result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if ("sendError" in result && result.sendError) {
+        toast.warning(
+          `Invoice created as draft, but email failed: ${result.sendError}`
+        );
+      } else {
+        toast.success("Invoice sent — client received email with payment link");
+      }
+      if ("invoiceId" in result && result.invoiceId) {
+        router.push(`/invoices/${result.invoiceId}`);
+      }
+      return;
+    }
+
+    const result = await createInvoice(data);
     if (result.error) {
       toast.error(result.error);
       return;
     }
-
-    toast.success(isEditing ? "Invoice updated" : "Invoice created");
-    if (!isEditing && "invoiceId" in result) {
+    toast.success("Draft saved");
+    if ("invoiceId" in result) {
       router.push(`/invoices/${result.invoiceId}`);
-    } else {
-      router.push("/invoices");
     }
   }
 
@@ -305,16 +336,37 @@ export function InvoiceForm({ clients, invoice }: InvoiceFormProps) {
             </Card>
 
             <div className="flex flex-col gap-2">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Saving..."
-                  : isEditing
-                    ? "Update Invoice"
-                    : "Save as Draft"}
-              </Button>
+              {isEditing ? (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Update Invoice"}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="submit"
+                    onClick={() => setSubmitMode("send")}
+                    disabled={isSubmitting}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    {isSubmitting && submitMode === "send"
+                      ? "Sending..."
+                      : "Save & Send"}
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    onClick={() => setSubmitMode("draft")}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting && submitMode === "draft"
+                      ? "Saving..."
+                      : "Save as Draft"}
+                  </Button>
+                </>
+              )}
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => router.back()}
                 disabled={isSubmitting}
               >

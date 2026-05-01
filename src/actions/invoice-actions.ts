@@ -8,6 +8,7 @@ import { Client } from "@/models/client";
 import { invoiceSchema, InvoiceFormData } from "@/lib/validations";
 import { TIER_LIMITS, TIER_LABELS } from "@/lib/constants";
 import type { InvoiceStatus, Tier } from "@/lib/constants";
+import { sendInvoiceEmail } from "@/actions/email-actions";
 
 /**
  * Convert form values (dollars) to storage values (cents).
@@ -183,6 +184,32 @@ export async function createInvoice(data: InvoiceFormData) {
   revalidatePath("/invoices");
   revalidatePath("/dashboard");
   return { success: true, invoiceId: invoice._id.toString() };
+}
+
+/**
+ * Create an invoice AND immediately email it to the client (same flow as
+ * the subscription "Send invoice now" button). Status is flipped to "sent"
+ * by sendInvoiceEmail; sentAt is recorded; the email contains a link to
+ * the public invoice page where the client can pay via Stripe.
+ */
+export async function createAndSendInvoice(data: InvoiceFormData) {
+  const created = await createInvoice(data);
+  if ("error" in created && created.error) return created;
+  if (!("invoiceId" in created) || !created.invoiceId) {
+    return { error: "Failed to create invoice" };
+  }
+
+  const sent = await sendInvoiceEmail(created.invoiceId);
+  if ("error" in sent && sent.error) {
+    // Invoice exists as draft; surface error so the user can retry the send
+    return {
+      success: true,
+      invoiceId: created.invoiceId,
+      sendError: sent.error,
+    };
+  }
+
+  return { success: true, invoiceId: created.invoiceId, sent: true };
 }
 
 export async function updateInvoice(invoiceId: string, data: InvoiceFormData) {
