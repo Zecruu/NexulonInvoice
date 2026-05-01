@@ -23,16 +23,16 @@ import {
 import { cn } from "@/lib/utils";
 import { useWhatsAppUnread } from "@/hooks/use-whatsapp-unread";
 
-const baseNav = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, badge: "whatsapp" as const },
-  { label: "Settings", href: "/settings", icon: Settings },
-];
-
 const invoicingNav = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Invoices", href: "/invoices", icon: FileText },
   { label: "Subscriptions", href: "/subscriptions", icon: Repeat },
   { label: "Clients", href: "/clients", icon: Users },
+];
+
+const alwaysNav = [
+  { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle, badge: "whatsapp" as const },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 interface MobileNavProps {
@@ -46,9 +46,8 @@ export function MobileNav({ isAdmin, invoicingEnabled }: MobileNavProps) {
   const unread = useWhatsAppUnread();
 
   const items = [
-    baseNav[0],
     ...(invoicingEnabled ? invoicingNav : []),
-    ...baseNav.slice(1),
+    ...alwaysNav,
     ...(isAdmin ? [{ label: "Users", href: "/admin", icon: Shield }] : []),
   ];
 
