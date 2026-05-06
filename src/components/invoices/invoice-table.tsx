@@ -10,6 +10,7 @@ import {
   Copy,
   Trash2,
   Send,
+  CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -30,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./status-badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog";
 import { deleteInvoice, duplicateInvoice } from "@/actions/invoice-actions";
 import { resendInvoiceEmail } from "@/actions/email-actions";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -43,6 +45,10 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [markPaidTarget, setMarkPaidTarget] = useState<{
+    id: string;
+    number: string;
+  } | null>(null);
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -145,6 +151,20 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
                             </Link>
                           </DropdownMenuItem>
                         )}
+                      {invoice.status !== "paid" &&
+                        invoice.status !== "cancelled" && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setMarkPaidTarget({
+                                id: invoice._id,
+                                number: invoice.invoiceNumber,
+                              })
+                            }
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Mark as Paid (check / cash)
+                          </DropdownMenuItem>
+                        )}
                       <DropdownMenuItem
                         onClick={() => handleDuplicate(invoice._id)}
                       >
@@ -175,6 +195,15 @@ export function InvoiceTable({ invoices }: InvoiceTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {markPaidTarget && (
+        <MarkPaidDialog
+          invoiceId={markPaidTarget.id}
+          invoiceNumber={markPaidTarget.number}
+          open={!!markPaidTarget}
+          onOpenChange={(open) => !open && setMarkPaidTarget(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={!!deleteId}

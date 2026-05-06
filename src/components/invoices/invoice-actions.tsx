@@ -40,10 +40,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog";
 import {
   deleteInvoice,
   duplicateInvoice,
-  updateInvoiceStatus,
 } from "@/actions/invoice-actions";
 import { createCheckoutSession } from "@/actions/payment-actions";
 import { sendInvoiceEmail, resendInvoiceEmail } from "@/actions/email-actions";
@@ -60,6 +60,7 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
   const [loading, setLoading] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [recurringSaving, setRecurringSaving] = useState(false);
+  const [showMarkPaid, setShowMarkPaid] = useState(false);
   const [frequency, setFrequency] = useState<"monthly" | "yearly">("monthly");
   const [dueDays, setDueDays] = useState(7);
   const [autoSend, setAutoSend] = useState(true);
@@ -94,16 +95,6 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
     } else {
       toast.success("Invoice duplicated");
       router.push(`/invoices/${result.invoiceId}`);
-    }
-  }
-
-  async function handleMarkPaid() {
-    const result = await updateInvoiceStatus(invoice._id, "paid");
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success("Invoice marked as paid");
-      router.refresh();
     }
   }
 
@@ -177,9 +168,9 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
                 <CreditCard className="mr-2 h-4 w-4" />
                 Generate Payment Link
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleMarkPaid}>
+              <DropdownMenuItem onClick={() => setShowMarkPaid(true)}>
                 <CheckCircle className="mr-2 h-4 w-4" />
-                Mark as Paid
+                Mark as Paid (check / cash)
               </DropdownMenuItem>
             </>
           )}
@@ -231,6 +222,13 @@ export function InvoiceActions({ invoice }: InvoiceActionsProps) {
         variant="destructive"
         onConfirm={handleDelete}
         loading={loading}
+      />
+
+      <MarkPaidDialog
+        invoiceId={invoice._id}
+        invoiceNumber={invoice.invoiceNumber}
+        open={showMarkPaid}
+        onOpenChange={setShowMarkPaid}
       />
 
       <Dialog open={showRecurring} onOpenChange={setShowRecurring}>

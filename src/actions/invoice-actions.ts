@@ -335,6 +335,49 @@ export async function duplicateInvoice(invoiceId: string) {
   return { success: true, invoiceId: duplicate._id.toString() };
 }
 
+/**
+ * Manually mark an invoice as paid (off-Stripe — check, cash, bank transfer, etc).
+ * Mirrors what the Stripe webhook does on checkout.session.completed: flips
+ * status to paid, sets paidAt/paidAmount, and creates a Payment record so the
+ * dashboard revenue charts and recent-payments queries pick it up.
+ */
+export async function markInvoicePaidManually(
+  invoiceId: string,
+  paymentMethod: "check" | "cash" | "bank_transfer" | "other",
+  note?: string
+) {
+  const user = await getCurrentUser();
+  await dbConnect();
+
+  const invoice = await Invoice.findOne({ _id: invoiceId, userId: user._id });
+  if (!invoice) return { error: "Invoice not found" };
+  if (invoice.status === "paid") return { error: "Invoice is already paid" };
+  if (invoice.status === "cancelled")
+    return { error: "Cannot mark a cancelled invoice as paid" };
+
+  invoice.status = "paid";
+  invoice.paidAt = new Date();
+  invoice.paidAmount = invoice.total;
+  await invoice.save();
+
+  const syntheticSessionId = `manual_${invoice._id.toString()}_${Date.now()}`;
+  await Payment.create({
+    invoiceId: invoice._id,
+    userId: invoice.userId,
+    stripeSessionId: syntheticSessionId,
+    amount: invoice.total,
+    currency: invoice.currency,
+    status: "succeeded",
+    paymentMethod,
+    metadata: note ? { note } : undefined,
+  });
+
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${invoiceId}`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function updateInvoiceStatus(
   invoiceId: string,
   status: InvoiceStatus
