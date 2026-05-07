@@ -96,5 +96,18 @@ export async function forwardLeadsByEmail(input: {
     return { error: `Failed to send: ${error.message}` };
   }
 
+  // Track that these leads were forwarded so the UI can avoid auto-selecting
+  // them on the next bundle.
+  await Lead.updateMany(
+    { _id: { $in: leads.map((l) => l._id) } },
+    {
+      $set: {
+        lastForwardedAt: new Date(),
+        lastForwardedTo: parsed.data.recipientEmail,
+      },
+      $inc: { forwardCount: 1 },
+    }
+  );
+
   return { success: true, sentCount: items.length, messageId: data?.id };
 }

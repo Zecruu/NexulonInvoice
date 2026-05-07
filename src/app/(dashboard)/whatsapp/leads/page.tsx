@@ -100,6 +100,11 @@ export default async function LeadsPage({
       l.createdAt instanceof Date
         ? l.createdAt.toISOString()
         : String(l.createdAt),
+    lastForwardedAt: l.lastForwardedAt
+      ? l.lastForwardedAt instanceof Date
+        ? l.lastForwardedAt.toISOString()
+        : String(l.lastForwardedAt)
+      : undefined,
     signals: ((l.signals || []) as Array<{
       rule: string;
       delta: number;

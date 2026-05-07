@@ -40,6 +40,9 @@ export interface ILead extends Document {
   score: number;
   signals: ILeadSignal[];
   notes?: string;
+  lastForwardedAt?: Date;
+  lastForwardedTo?: string;
+  forwardCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -106,6 +109,9 @@ const LeadSchema = new Schema<ILead>(
       default: [],
     },
     notes: String,
+    lastForwardedAt: Date,
+    lastForwardedTo: String,
+    forwardCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

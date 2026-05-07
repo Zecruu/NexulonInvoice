@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
+import { Forward as ForwardIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LeadSignalsDialog } from "@/components/whatsapp/lead-signals-dialog";
 import { ForwardLeadsDialog } from "@/components/whatsapp/forward-leads-dialog";
@@ -17,6 +18,7 @@ interface LeadRow {
   summary?: string;
   score: number;
   createdAt: string;
+  lastForwardedAt?: string;
   signals: Array<{
     rule: string;
     delta: number;
@@ -29,14 +31,36 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const allChecked = leads.length > 0 && selected.size === leads.length;
-  const someChecked = selected.size > 0 && !allChecked;
+  // Already-forwarded leads are excluded from select-all (you'd usually only
+  // want to bundle fresh ones), but the user can still tick them individually.
+  const unforwardedIds = useMemo(
+    () => leads.filter((l) => !l.lastForwardedAt).map((l) => l._id),
+    [leads]
+  );
+  const allUnforwardedChecked =
+    unforwardedIds.length > 0 &&
+    unforwardedIds.every((id) => selected.has(id));
+  const anyUnforwardedChecked = unforwardedIds.some((id) =>
+    selected.has(id)
+  );
+  const someChecked =
+    anyUnforwardedChecked && !allUnforwardedChecked;
 
   function toggleAll() {
-    if (allChecked) {
-      setSelected(new Set());
+    if (allUnforwardedChecked) {
+      // Unselect only the unforwarded ones (preserve any forwarded leads the
+      // user manually ticked)
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of unforwardedIds) next.delete(id);
+        return next;
+      });
     } else {
-      setSelected(new Set(leads.map((l) => l._id)));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of unforwardedIds) next.add(id);
+        return next;
+      });
     }
   }
 
@@ -78,7 +102,11 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
       <div className="flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
         <p className="text-sm text-muted-foreground">
           {selected.size === 0
-            ? `${leads.length} lead${leads.length === 1 ? "" : "s"}`
+            ? `${leads.length} lead${leads.length === 1 ? "" : "s"}${
+                unforwardedIds.length < leads.length
+                  ? ` · ${leads.length - unforwardedIds.length} already forwarded`
+                  : ""
+              }`
             : summary}
         </p>
         <ForwardLeadsDialog
@@ -102,13 +130,19 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
               <th className="w-10 px-3 py-2">
                 <input
                   type="checkbox"
-                  aria-label="Select all"
-                  checked={allChecked}
+                  aria-label="Select all not-yet-forwarded"
+                  checked={allUnforwardedChecked}
                   ref={(el) => {
                     if (el) el.indeterminate = someChecked;
                   }}
                   onChange={toggleAll}
-                  className="h-4 w-4 cursor-pointer"
+                  disabled={unforwardedIds.length === 0}
+                  className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    unforwardedIds.length === 0
+                      ? "All leads have already been forwarded"
+                      : `Select ${unforwardedIds.length} not-yet-forwarded lead${unforwardedIds.length === 1 ? "" : "s"}`
+                  }
                 />
               </th>
               <th className="px-4 py-2 font-medium">Name / Phone</th>
@@ -123,11 +157,16 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
           <tbody className="divide-y">
             {leads.map((l) => {
               const isChecked = selected.has(l._id);
+              const wasForwarded = !!l.lastForwardedAt;
               return (
                 <tr
                   key={l._id}
                   className={
-                    isChecked ? "bg-accent/50" : "hover:bg-accent/30"
+                    isChecked
+                      ? "bg-accent/50"
+                      : wasForwarded
+                        ? "opacity-70 hover:bg-accent/30 hover:opacity-100"
+                        : "hover:bg-accent/30"
                   }
                 >
                   <td className="px-3 py-3">
@@ -140,12 +179,23 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/whatsapp/${encodeURIComponent(l.waPhone)}`}
-                      className="font-medium hover:underline"
-                    >
-                      {l.name || l.waPhone}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/whatsapp/${encodeURIComponent(l.waPhone)}`}
+                        className="font-medium hover:underline"
+                      >
+                        {l.name || l.waPhone}
+                      </Link>
+                      {wasForwarded && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                          title={`Forwarded ${formatDistanceToNow(new Date(l.lastForwardedAt!), { addSuffix: true })}`}
+                        >
+                          <ForwardIcon className="h-2.5 w-2.5" />
+                          forwarded
+                        </span>
+                      )}
+                    </div>
                     {l.name && (
                       <p className="text-xs text-muted-foreground">{l.waPhone}</p>
                     )}
