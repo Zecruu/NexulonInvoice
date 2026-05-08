@@ -179,12 +179,12 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Link
                         href={`/whatsapp/${encodeURIComponent(l.waPhone)}`}
                         className="font-medium hover:underline"
                       >
-                        {l.name || l.waPhone}
+                        {l.name || "(no name yet)"}
                       </Link>
                       {wasForwarded && (
                         <span
@@ -196,9 +196,12 @@ export function LeadsTable({ leads }: { leads: LeadRow[] }) {
                         </span>
                       )}
                     </div>
-                    {l.name && (
-                      <p className="text-xs text-muted-foreground">{l.waPhone}</p>
-                    )}
+                    <a
+                      href={`tel:${l.waPhone}`}
+                      className="mt-0.5 inline-block select-all font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {l.waPhone}
+                    </a>
                   </td>
                   <td className="px-4 py-3">
                     <Badge
