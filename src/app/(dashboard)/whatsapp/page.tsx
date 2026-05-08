@@ -101,7 +101,7 @@ export default async function WhatsAppPage() {
                     <div className="flex flex-1 flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium">
-                          {c.customerName || c.profileName || c.waPhone}
+                          {c.customerName || c.profileName || "(no name yet)"}
                         </p>
                         {c.unread && (
                           <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
@@ -114,6 +114,9 @@ export default async function WhatsAppPage() {
                             : ""}
                         </span>
                       </div>
+                      <span className="select-all font-mono text-xs text-muted-foreground">
+                        {c.waPhone}
+                      </span>
                       <p className="line-clamp-1 text-sm text-muted-foreground">
                         {c.lastMessagePreview || "(no messages)"}
                       </p>
