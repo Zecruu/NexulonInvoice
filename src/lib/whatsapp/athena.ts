@@ -4,7 +4,7 @@ import type { IWhatsAppConversation } from "@/models/whatsapp-conversation";
 import type { IWhatsAppBotConfig } from "@/models/whatsapp-bot-config";
 
 const MODEL_CHAIN = [
-  "gemini-3.1-flash-lite-preview", // newest, cheapest
+  "gemini-3.1-flash-lite",         // GA — newest, cheapest (preview deprecated)
   "gemini-2.5-flash-lite",         // proven backup
   "gemini-2.5-flash",              // bigger, more capacity, ~3x cost
 ] as const;
